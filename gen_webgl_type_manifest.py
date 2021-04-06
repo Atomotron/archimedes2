@@ -79,7 +79,7 @@ names = {k:v for (v,k) in [
 
 # From the Open GL ES 2.0 spec (2.10.4)
 # This implies that either f32 or i32 arrays can be used to store booleans.
-# I choose i32 because it makes more sense to me.
+# I chose i32 because it might (?) be slightly more efficient.
 '''
 When loading values for a uniform declared as a boolean, a boolean vector,an array of booleans, or an array of boolean vectors, both the Uniform*i{v} and Uniform*f{v} set of commands can be used to load boolean values. Type conversion is done by the GL. The uniform is set to FALSE if the input value is 0 or 0.0f,and set to TRUE otherwise.
 '''
@@ -132,13 +132,7 @@ def uniform_setter_name(name,signature):
     if nelements <= 4:
         return f"uniform{nelements}{kind}v"
 
-# make dictionaries
-names = names
-nelements = {code: types[names[code]][1] for code in names} 
-nbytes = {code: types[names[code]][2] for code in names} 
-array_constructor = {code: types[names[code]][3] for code in names} 
-uniform_setter = {code: uniform_setter_name(names[code],types[names[code]]) for code in names} 
-
+# Make output dictionaries
 gl_types = {
     code: 
         {

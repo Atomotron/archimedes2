@@ -58,8 +58,14 @@ class Shader {
         console.log(nattribs,nuniforms);
         for (let i=0; i<nattribs; ++i) {
             const info = gl.getActiveAttrib(this.handle,i);
-            console.log(info.name,info.size,GL_TYPES[info.type]);
+            const type = GL_TYPES[info.type];
+            console.log(info.name,info.size,type.name,type.nelements);
         }
+        for (let i=0; i<nuniforms; ++i) {
+            const info = gl.getActiveUniform(this.handle,i);
+            const type = GL_TYPES[info.type];
+            console.log(info.name,info.size,type.name,type.nelements);
+        }   
     }
     // Tell OpenGL to forget about this program.
     destroy(gl) {
