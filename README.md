@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/Atomotron/archimedes2/master/logo.svg" alt="AE2 logo" width="250">
+<img src="https://raw.githubusercontent.com/Atomotron/archimedes2/master/logo.svg" alt="AE2 logo" width="250" align="right">
 
 # Archimedes Engine 2
 
