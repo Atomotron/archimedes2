@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>Archimedes Engine 2</title>
     <script src="webgltypes.js"></script>
+    <script src="euclidian.js"></script>
 </head>
 <body>
 
@@ -42,6 +43,28 @@ void main() {
 
 <script>
 'use strict'
+
+// Can I use closures in class creation?
+
+function makeClass(x,y,z) {
+    class Foo {
+        zee = z;
+        constructor() {
+            this.x = x;
+        }
+        bar() {
+            console.log(this.x,y,this.zee);
+        }
+    }
+    return Foo;
+}
+
+const Foo1 = makeClass(1,2,3);
+const foo1 = new Foo1();
+foo1.bar();
+const Foo2 = makeClass("Hello","World","!");
+const foo2 = new Foo2();
+foo2.bar();
 
 // Shading program
 class Shader {
