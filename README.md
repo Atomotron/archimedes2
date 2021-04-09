@@ -37,4 +37,4 @@ gl[type.uniformv](id,storage); // This will upload the appropriate data.
 
 ## Vector
 
-To be documented.
+This module contains vector and matrix algebra routines. It exposes them with a fourfold interface: every method is available as an assembly-like operand/output function, an in-place modification, a static constructor, and an allocating infix operator.

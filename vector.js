@@ -59,11 +59,11 @@ function __testVectorCode() {
     asserteq(va.mul(3),Vec4.From(3,0,0,0));
     
     //////// Vec3I - a four-dimensional integer vector
-    va = Vec3I.Xhat();
+    va = Vec3I.From(1,0,0);
     asserteq(va.typecheck(),true);
     asserteq(va.is_compatible(Vec3.Xhat()),false);
-    vb = Vec3I.Yhat();
-    vc = va.add(vb).add(Vec3I.Zhat());
+    vb = Vec3I.From(0,1,0);
+    vc = va.add(vb).add(Vec3I.From(0,0,1));
     asserteq(vc,Vec3I.From(1,1,1));
     asserteq(vc.dot(va),1.0);
     asserteq(1.0,va.dot(vc));
@@ -237,11 +237,50 @@ class IndirectArray {
     }
 });
 
-// Vector methods that can be written in coordinate-free
-// fashion, without reference to anything but the generic
-// methods like `add`, `mul`, and `dot`.
+// Vector methods that are generic over all vector lengths.
 const AbstractVecN = generateVariantMethods(
 class AbstractVecN extends IndirectArray {
+    // GENERIC METHODS (override these in small-size subclasses)
+    // due to inlining size limitations, you might not want to
+    // bother overriding them in large-size vectors.
+    eqFrom(...numbers) {
+        const count = Math.min(this.constructor.SIZE,numbers.length);
+        for (let i=0; i<count; ++i) {
+            this.a[i] = numbers[i];
+        }
+        return this;
+    }
+    // Default n-ary vector addition
+    eqAdd(self,other) {
+        for (let i=0; i<this.constructor.SIZE; ++i) {
+            this.a[i] = self.a[i] + other.a[i];
+        }
+        return this;
+    }
+    // Default n-ary vector subtraction
+    eqSub(self,other) {
+        for (let i=0; i<this.constructor.SIZE; ++i) {
+            this.a[i] = self.a[i] - other.a[i];
+        }
+        return this;
+    }
+    // Default n-ary scalar multiplication
+    eqMul(self,scalar) {
+        for (let i=0; i<this.constructor.SIZE; ++i) {
+            this.a[i] = self.a[i] * scalar;
+        }
+        return this;
+    }
+    // Default n-ary dot product
+    dot(other) {
+        let sum = Math.fround(0.0);
+        for (let i=0; i<this.constructor.SIZE; ++i) {
+            sum = Math.fround(sum + Math.fround(this.a[i] * other.a[i]));
+        }
+        return sum;
+    }
+    
+    // COORDINATE-FREE METHODS (which won't be overriden)
     // R^n -> R
     // Vector magnitude
     mag() {
@@ -251,6 +290,16 @@ class AbstractVecN extends IndirectArray {
     // Vector magnitude squared
     mag2() {
         return this.dot(this);
+    }
+    // R^n -> R^n
+    // Normalizes (makes unit-length) the input vector
+    // Returns a zero-length vector if given a zero-length vector.
+    eqNorm(self) {
+        const mag = self.mag();
+        if (mag === 0.0) { // This is a safe function!
+            return this.eqZero(); // f(0) always makes vec 0
+        }
+        return this.eqMul(1.0 / mag);
     }
     // R^n -> (R -> R) -> R^n
     // Calls `magnitude_function` on the magnitude of the input vector,
@@ -265,7 +314,7 @@ class AbstractVecN extends IndirectArray {
     eqMapMag(self,magnitude_function) {
         const mag = self.mag();
         if (mag === 0.0) { // This is a safe function!
-            return this.eqzero(); // f(0) always makes vec 0
+            return this.eqZero(); // f(0) always makes vec 0
         }
         const new_mag = magnitude_function(mag);
         const ratio = new_mag / mag;
@@ -304,9 +353,14 @@ class Vec1 extends AbstractVecN {
         this.a[0] = self.a[0] + other.a[0];
         return this;
     }
+    // Vector subtraction
+    eqSub(self,other) {
+        this.a[0] = self.a[0] - other.a[0];
+        return this;
+    }
     // Dot product
     dot(other) {
-        return this.a[0] * other.a[0];
+        return Math.fround(this.a[0] * other.a[0]);
     }
 });
 
@@ -352,11 +406,18 @@ class Vec2 extends AbstractVecN {
         out[1] = a[1] + b[1];
         return this;
     }
+    // Vector subtraction
+    eqSub(self,other) {
+        const [out,a,b] = [this.a,self.a,other.a];
+        out[0] = a[0] - b[0];
+        out[1] = a[1] - b[1];
+        return this;
+    }
     // Dot product
     dot(other) {
         const [a,b] = [this.a,other.a];
-        return a[0] * b[0] +
-               a[1] * b[1];
+        return Math.fround(a[0] * b[0]) +
+               Math.fround(a[1] * b[1]);
     }
 });
 
@@ -398,12 +459,20 @@ class Vec3 extends AbstractVecN {
         out[2] = a[2] + b[2];
         return this;
     }
+    // Vector subtraction
+    eqSub(self,other) {
+        const [out,a,b] = [this.a,self.a,other.a];
+        out[0] = a[0] - b[0];
+        out[1] = a[1] - b[1];
+        out[2] = a[2] - b[2];
+        return this;
+    }
     // Dot product
     dot(other) {
         const [a,b] = [this.a,other.a];
-        return a[0] * b[0] +
-               a[1] * b[1] +
-               a[2] * b[2];
+        return Math.fround(a[0] * b[0]) +
+               Math.fround(a[1] * b[1]) +
+               Math.fround(a[2] * b[2]);
     }
 });
 
@@ -451,29 +520,92 @@ class Vec4 extends AbstractVecN {
         out[3] = a[3] + b[3];
         return this;
     }
+    // Vector subtraction
+    eqSub(self,other) {
+        const [out,a,b] = [this.a,self.a,other.a];
+        out[0] = a[0] - b[0];
+        out[1] = a[1] - b[1];
+        out[2] = a[2] - b[2];
+        out[3] = a[3] - b[3];
+        return this;
+    }
     // Dot product
     dot(other) {
         const [a,b] = [this.a,other.a];
-        return a[0] * b[0] +
-               a[1] * b[1] +
-               a[2] * b[2] +
-               a[3] * b[3];
+        return Math.fround(a[0] * b[0]) +
+               Math.fround(a[1] * b[1]) +
+               Math.fround(a[2] * b[2]) +
+               Math.fround(a[3] * b[3]);
     }
 });
 
+// A nine-dimensional vector, made especially for Mat3.
+// Uses default (iterative) implementations.
+const Vec9 = generateVariantMethods(
+class Vec9 extends AbstractVecN {
+    static TYPE = Float32Array;
+    static SIZE = 9;
+});
+
+// A sixteen-dimensional vector, made especially for Mat4.
+// Uses default (iterative) implementations.
+const Vec16 = generateVariantMethods(
+class Vec16 extends AbstractVecN {
+    static TYPE = Float32Array;
+    static SIZE = 16;
+});
+
 // Integer vectors
-class Vec1I extends Vec1 {
+// Note: By extending AbstractVecN, we won't
+//       polymorphize the highly optimized instance
+//       methods for addition and that kind of thing.
+class Vec1I extends AbstractVecN {
     static TYPE = Int32Array;
+    static SIZE = 1;
 }
-class Vec2I extends Vec2 {
+class Vec2I extends AbstractVecN {
     static TYPE = Int32Array;
+    static SIZE = 2;
 }
-class Vec3I extends Vec3 {
+class Vec3I extends AbstractVecN {
     static TYPE = Int32Array;
+    static SIZE = 3;
 }
-class Vec4I extends Vec4 {
+class Vec4I extends AbstractVecN {
     static TYPE = Int32Array;
+    static SIZE = 4;
 }
+
+// Matrix methods that can be written in coordinate-free
+// fashion, without reference to anything but the generic
+// methods like `add`, `mul`, `compose`, and `dot`.
+const AbstractMatMixin = (Base) => generateVariantMethods(
+    class extends Base {
+        // Computes the inverse of the given matrix
+        eqInverse(self) {
+            const det = self.determinant();
+            if (det === 0.0) {
+                // Singular matrix
+                return this.eqZero();
+            }
+            this.eqAdjugate(self);
+            return this.mulEq(1.0 / det);
+        }
+    }
+);
+
+
+// 2D Matrix type
+const Mat2 = generateVariantMethods(
+class Mat2 extends AbstractMatMixin(Vec4) {
+    // Identity matrix
+    static eqI() {
+        const o = this.a;
+        o[0] = 1.0; o[1] = 0.0;
+        o[2] = 0.0; o[3] = 1.0;
+        return this;
+    }
+});
 
 // Maps type name to the indirect array class that can store that type.
 const GL_TYPE_INDIRECT_ARRAYS = {
