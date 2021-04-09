@@ -1,3 +1,4 @@
+'use strict'
 // WebGL Types
 // GL_TYPES is an object with one entry for each OpenGL type code.
 // Each entry has, as fields:
@@ -30,7 +31,7 @@ function GL_TYPES_test(gl) {
 }
 
 
-GL_TYPES = {
+const GL_TYPES = {
      0x1400:{
         TypedArray : Int8Array,
         name : "BYTE",
@@ -186,7 +187,7 @@ GL_TYPES = {
         uniformv : "uniform1iv",
      },
 }
-GL_TYPE_CODES = {
+const GL_TYPE_CODES = {
     BOOL : 0x8B56,
     BOOL_VEC2 : 0x8B57,
     BOOL_VEC3 : 0x8B58,

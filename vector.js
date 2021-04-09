@@ -57,6 +57,17 @@ function __testVectorCode() {
     asserteq(vc.dot(va),1.0);
     asserteq(1.0,va.dot(vc));
     asserteq(va.mul(3),Vec4.From(3,0,0,0));
+    
+    //////// Vec3I - a four-dimensional integer vector
+    va = Vec3I.Xhat();
+    asserteq(va.typecheck(),true);
+    asserteq(va.is_compatible(Vec3.Xhat()),false);
+    vb = Vec3I.Yhat();
+    vc = va.add(vb).add(Vec3I.Zhat());
+    asserteq(vc,Vec3I.From(1,1,1));
+    asserteq(vc.dot(va),1.0);
+    asserteq(1.0,va.dot(vc));
+    asserteq(va.mul(3),Vec3I.From(3,0,0));
 }
 
 // A helper function that can determine the names of a function's arguments.
@@ -464,7 +475,8 @@ class Vec4I extends Vec4 {
     static TYPE = Int32Array;
 }
 
-GL_TYPE_CODES = {
+// Maps type name to the indirect array class that can store that type.
+const GL_TYPE_INDIRECT_ARRAYS = {
     BOOL : Vec1I,
     BOOL_VEC2 : Vec2I,
     BOOL_VEC3 : Vec3I,
