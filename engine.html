@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Archimedes Engine 2</title>
     <script src="webgltypes.js"></script>
-    <script src="euclidian.js"></script>
+    <script src="vector.js"></script>
 </head>
 <body>
 
@@ -44,28 +44,6 @@ void main() {
 <script>
 'use strict'
 
-// Can I use closures in class creation?
-
-function makeClass(x,y,z) {
-    class Foo {
-        zee = z;
-        constructor() {
-            this.x = x;
-        }
-        bar() {
-            console.log(this.x,y,this.zee);
-        }
-    }
-    return Foo;
-}
-
-const Foo1 = makeClass(1,2,3);
-const foo1 = new Foo1();
-foo1.bar();
-const Foo2 = makeClass("Hello","World","!");
-const foo2 = new Foo2();
-foo2.bar();
-
 // Shading program
 class Shader {
     // OpenGL type enum -> string mapping
@@ -78,16 +56,13 @@ class Shader {
         // Uncover shader inputs (uniforms and attributes)
         const nattribs = gl.getProgramParameter(this.handle,gl.ACTIVE_ATTRIBUTES);
         const nuniforms = gl.getProgramParameter(this.handle,gl.ACTIVE_UNIFORMS);
-        console.log(nattribs,nuniforms);
         for (let i=0; i<nattribs; ++i) {
             const info = gl.getActiveAttrib(this.handle,i);
             const type = GL_TYPES[info.type];
-            console.log(info.name,info.size,type.name,type.nelements);
         }
         for (let i=0; i<nuniforms; ++i) {
             const info = gl.getActiveUniform(this.handle,i);
             const type = GL_TYPES[info.type];
-            console.log(info.name,info.size,type.name,type.nelements);
         }   
     }
     // Tell OpenGL to forget about this program.
