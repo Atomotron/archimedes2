@@ -5,7 +5,8 @@ Javascript code generation to produce fast type data lookups.
 
 OUTPUT_FILENAME = "webgltypes.js"
 
-HEADER = '''// WebGL Types
+HEADER = ''''use strict'
+// WebGL Types
 // GL_TYPES is an object with one entry for each OpenGL type code.
 // Each entry has, as fields:
 // - name       (the name of the type as used by WebGL, 
@@ -163,7 +164,7 @@ with open(OUTPUT_FILENAME,'w') as dst:
         return '{\n' + ''.join(lines) + '     '*indent + '}'
     blocks = []
     blocks.append(HEADER)
-    blocks.append('GL_TYPES = '+jsformat(gl_types))
-    blocks.append('GL_TYPE_CODES = '+jsformat(gl_type_codes))
+    blocks.append('const GL_TYPES = '+jsformat(gl_types))
+    blocks.append('const GL_TYPE_CODES = '+jsformat(gl_type_codes))
     blocks.append('\n')
     dst.write('\n'.join(blocks))
