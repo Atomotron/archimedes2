@@ -2,6 +2,43 @@
 // The math of Euclidian space.
 // Heavy use of automatic code generation inside.
 
+/*
+### Variant Methods
+All methods are available to be called in four different ways. They are based on each other in a systematic way. For example, consider vector addition; four methods will be available.
+1. `c.eqAdd(a,b)`, which sets `c` to the sum of `a` and `b`. Like `c = a+b`.
+2. `a.addEq(b)`, which sets `a` to the sum of `a` and `b`. Like `a += b`.
+3. `a.add(b)`, which allocates and returns a new vector, the sum of `a` and `b`. Like `a + b`.
+4. `VecN.Add(a,b)` Constructs a new `VecN` (for some integer N) and makes it the sum of `a` and `b`. This is not often used for addition, but it is very useful for certain methods. For example, the crucial `VecN.Zero()` zero-value constructor is made in this way, originating in an implementation of `eqZero`.
+
+### Vector Types
+- Floating point vectors `Vec1, Vec2, Vec3, Vec4`
+- 32-bit integer vectors `Vec1I, Vec2I, Vec3I, Vec4I`
+
+### Base vector methods
+On all vectors:
+- `eqFrom(x,y,...)` (Setter)
+- `eqAdd`
+- `eqSub`
+- `eqMul`
+- `dot` (dot product)
+- `mag` (length)
+- `mag2` (length squared)
+- `eqNorm` (makes length 1 and keeps direction)
+- `eqMapMag` (maps length through magnitude function)
+
+Only on Vec2:
+- eqRotate(self,theta)
+
+#### Property accessors and special constructors:
+On all vector types, you can get and set elements with `v.x`, `v.y`, `v.z`, and `v.w`, as appropriate for the number of elements in the vector. (For example, Vec2 would have `x` and `y` attributes.)
+
+You can also, as appropriate for the number of dimensions, use x/y/z/w unit vector constructors:
+- `eqXhat, eqYhat, eqZhat, eqWhat` to set existing vectors to the unit vectors
+- `Vec4.Xhat(), Vec4.Yhat(), Vec4.Zhat(), Vec4.What()` to construct the unit vectors
+Unsurprisingly, these are available depending on the dimensionality of the vector class. (For example, `Vec2` has `eqXhat` and `eqYhat`).
+*/
+
+
 // Tests are the best documentation, eh?
 function __testVectorCode() {
     function asserteq(a,b) {
