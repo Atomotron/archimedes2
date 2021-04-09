@@ -132,6 +132,9 @@ function extractArgs(fn) {
     return args;
 }
 
+// This implements the "fourfold interface" of the vector and matrix classes.
+// Starting with a function of the form eqFoo, it will produce foo, static Foo,
+// and the updating assignment method (i.e. like += or *=) fooEq.
 function generateVariantMethods(Class) {
     const IS_EQ_FUNCTION = /^eq.*/;
     function attachMethod(target,name,method_string) {
@@ -613,9 +616,10 @@ class Vec4I extends AbstractVecN {
     static SIZE = 4;
 }
 
-// Matrix methods that can be written in coordinate-free
-// fashion, without reference to anything but the generic
-// methods like `add`, `mul`, `compose`, and `dot`.
+
+// The abstract Matrix class is written as a mixin so that 
+// the matrix classes can extend both it and their corresponding
+// vector classes.
 const AbstractMatMixin = (Base) => generateVariantMethods(
     class extends Base {
         // Computes the inverse of the given matrix
