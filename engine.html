@@ -5,7 +5,7 @@
     <title>Archimedes Engine 2</title>
     <script src="webgltypes.js"></script>
     <script src="vector.js"></script>
-    <script src="shader.js"></script>
+    <script type="module" src="shader.js"></script>
 </head>
 <body>
 
@@ -43,6 +43,7 @@ void main() {
 </script>
 
 <script>
+import {Shader} from 'shader.js';
 'use strict'
 
 // Attempts to create a webgl context with some common extensions.

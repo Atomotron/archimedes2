@@ -7,7 +7,7 @@ Depends on:
 
 
 // Shading program
-class Shader {
+export class Shader {
     // OpenGL type enum -> string mapping
     // gl[TYPES[x]] == x, for all x in:
     // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Constants#data_types
@@ -51,7 +51,7 @@ class Shader {
 //      {myshader:['vertshader','fragshader']},
 //  );
 //  // shaders ==> {myshader: [object Shader]}
-function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
+export function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
     let errors = 0;
     // Verify that sources are actually strings
     function checkTypes(sources,type) {
