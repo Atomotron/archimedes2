@@ -480,11 +480,11 @@ class Vec2 extends AbstractVecN {
     }
     // Matrix transformation
     eqTransform(self,matrix) {
-        const o = this.a, x = self.a, A = matrix.a;
+        const o = this.a, x = self.a, a = matrix.a;
         const a00 = a[0],a01 = a[1],a10 = a[2],a11 = a[3];
         o[0] = a00*x[0] + a01*x[1];
         o[1] = a10*x[0] + a11*x[1];
-        return o;
+        return this;
     }
 });
 
@@ -540,6 +540,17 @@ class Vec3 extends AbstractVecN {
         return Math.fround(a[0] * b[0]) +
                Math.fround(a[1] * b[1]) +
                Math.fround(a[2] * b[2]);
+    }
+    // Matrix transformation
+    eqTransform(self,matrix) {
+        const o = this.a, x = self.a, a = matrix.a;
+        const a00=a[0],a01=a[1],a02=a[2],
+              a10=a[3],a11=a[4],a12=a[5],
+              a20=a[6],a21=a[7],a22=a[8];
+        o[0] = a00*x[0] + a01*x[1] + a02*x[2];
+        o[1] = a10*x[0] + a11*x[1] + a12*x[2];
+        o[2] = a20*x[0] + a21*x[1] + a22*x[2];
+        return this;
     }
 });
 
@@ -603,6 +614,19 @@ class Vec4 extends AbstractVecN {
                Math.fround(a[1] * b[1]) +
                Math.fround(a[2] * b[2]) +
                Math.fround(a[3] * b[3]);
+    }
+    // Matrix transformation
+    eqTransform(self,matrix) {
+        const o = this.a, x = self.a, a = matrix.a;
+        const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
+              a10=a[4],a11=a[5],a12=a[6],a13=a[7],
+              a20=a[8],a21=a[9],a22=a[10],a23=a[11],
+              a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+        o[0] = a00*x[0] + a01*x[1] + a02*x[2] + a03*x[3];
+        o[1] = a10*x[0] + a11*x[1] + a12*x[2] + a13*x[3];
+        o[2] = a20*x[0] + a21*x[1] + a22*x[2] + a23*x[3];
+        o[3] = a30*x[0] + a31*x[1] + a32*x[2] + a33*x[3];
+        return this;
     }
 });
 
@@ -678,7 +702,40 @@ function __testMatrices() {
     let Ainv = A.inverse();
     asserteq(Mat2.Id(), A.compose(Ainv));
     // 3D Matrices
+    A = Mat3.From(
+         0, -1, 0,
+         1,  0, 0,
+         3,  3, 3,
+    );
+    Ainv = A.inverse();
+    asserteq(Mat3.Id(), A.compose(Ainv));
     
+    // 4D Matrices
+    A = Mat4.From(
+         0, -1, 0, 0,
+         1,  0, 0, 1,
+         3,  3, 3, 0,
+         0,  4, 1, 1
+    );
+    Ainv = A.inverse();
+    asserteq(Mat4.Id(), A.compose(Ainv));
+    
+    // Transformations
+    asserteq(Vec2.Yhat().transform(Mat2.From(
+        1, 2,
+        3, 4,
+    )), Vec2.From(2,4) );
+    asserteq(Vec3.Yhat().transform(Mat3.From(
+        1, 2, 5,
+        3, 4, 6,
+        7, 8, 9,
+    )), Vec3.From(2,4,8) );
+    asserteq(Vec4.Yhat().transform(Mat4.From(
+        1, 2, 5, 10,
+        3, 4, 6, 11,
+        7, 8, 9, 12,
+        13,14,15,16,
+    )), Vec4.From(2,4,8,14) );
 }
 
 // The abstract Matrix class is written as a mixin so that 
@@ -731,6 +788,7 @@ class Mat2 extends AbstractMatMixin(Vec4) {
     set a00(v){this.a[0] = v};
     get a01() {return this.a[1]};
     set a01(v){this.a[1] = v};
+    
     get a10() {return this.a[2]};
     set a10(v){this.a[2] = v};
     get a11() {return this.a[3]};
@@ -789,6 +847,264 @@ class Mat2 extends AbstractMatMixin(Vec4) {
     }
 });
 
+// 3D Matrix type
+const Mat3 = generateVariantMethods(
+class Mat3 extends AbstractMatMixin(Vec9) {
+    get a00() {return this.a[0]};
+    set a00(v){this.a[0] = v};
+    get a01() {return this.a[1]};
+    set a01(v){this.a[1] = v};
+    get a02() {return this.a[2]};
+    set a02(v){this.a[2] = v};
+    
+    get a10() {return this.a[3]};
+    set a10(v){this.a[3] = v};
+    get a11() {return this.a[4]};
+    set a11(v){this.a[4] = v};
+    get a12() {return this.a[5]};
+    set a12(v){this.a[5] = v};
+    
+    get a20() {return this.a[6]};
+    set a20(v){this.a[6] = v};
+    get a21() {return this.a[7]};
+    set a21(v){this.a[7] = v};
+    get a22() {return this.a[8]};
+    set a22(v){this.a[8] = v};
+    // Identity matrix
+    eqId() {
+        const o = this.a;
+        o[0] = 1.0; o[1] = 0.0; o[2] = 0.0; 
+        o[3] = 0.0; o[4] = 1.0; o[5] = 0.0;
+        o[6] = 0.0; o[7] = 0.0; o[8] = 1.0;
+        return this;
+    }
+    // Construct default instance - the identity
+    static Default() {
+        const a = new this.TYPE(this.SIZE);
+        a[0] = 1.0;
+        a[4] = 1.0;
+        a[8] = 1.0;
+        return new this(a);
+    }
+    // Composition with an argument-specified matrix
+    eqComposeFrom(self,b00,b01,b02, b10,b11,b12, b20,b21,b22,) {
+        const o = this.a, a = self.a;
+        const a00=a[0],a01=a[1],a02=a[2],
+              a10=a[3],a11=a[4],a12=a[5],
+              a20=a[6],a21=a[7],a22=a[8];
+        o[0] = a00 * b00 + a01 * b10 + a02 * b20; //o00
+        o[1] = a00 * b01 + a01 * b11 + a02 * b21; //o01
+        o[2] = a00 * b02 + a01 * b12 + a02 * b22; //o02
+        
+        o[3] = a10 * b00 + a11 * b10 + a12 * b20; //o10
+        o[4] = a10 * b01 + a11 * b11 + a12 * b21; //o11
+        o[5] = a10 * b02 + a11 * b12 + a12 * b22; //o12
+        
+        o[6] = a20 * b00 + a21 * b10 + a22 * b20; //o20
+        o[7] = a20 * b01 + a21 * b11 + a22 * b21; //o21
+        o[8] = a20 * b02 + a21 * b12 + a22 * b22; //o22
+        return this;
+    }
+    // Matrix multiplication (composition of transformation)
+    eqCompose(self,other) {
+        const b = other.a;
+        return this.eqComposeFrom(self, 
+            b[0],b[1],b[2],
+            b[3],b[4],b[5],
+            b[6],b[7],b[8],
+        );
+    }
+    // Determinant (equal to product of all eigenvalues)
+    determinant() {
+        const a = this.a;
+        const a00=a[0],a01=a[1],a02=a[2],
+              a10=a[3],a11=a[4],a12=a[5],
+              a20=a[6],a21=a[7],a22=a[8];
+        return (
+            a00 * (a22 * a11 - a12 * a21) +
+            a01 * (-a22 * a10 + a12 * a20) +
+            a02 * (a21 * a10 - a11 * a20)
+        );
+    }
+    // Adjugate
+    eqAdjugate(self) {
+        const o = this.a,a = self.a;
+        const a00=a[0],a01=a[1],a02=a[2],
+              a10=a[3],a11=a[4],a12=a[5],
+              a20=a[6],a21=a[7],a22=a[8];
+        o[0] = a11 * a22 - a12 * a21;
+        o[1] = a02 * a21 - a01 * a22;
+        o[2] = a01 * a12 - a02 * a11;
+        o[3] = a12 * a20 - a10 * a22;
+        o[4] = a00 * a22 - a02 * a20;
+        o[5] = a02 * a10 - a00 * a12;
+        o[6] = a10 * a21 - a11 * a20;
+        o[7] = a01 * a20 - a00 * a21;
+        o[8] = a00 * a11 - a01 * a10;
+        return this;
+    }
+});
+
+// 4D Matrix type
+const Mat4 = generateVariantMethods(
+class Mat4 extends AbstractMatMixin(Vec16) {
+    get a00() {return this.a[0]};
+    set a00(v){this.a[0] = v};
+    get a01() {return this.a[1]};
+    set a01(v){this.a[1] = v};
+    get a02() {return this.a[2]};
+    set a02(v){this.a[2] = v};
+    get a03() {return this.a[3]};
+    set a03(v){this.a[3] = v};
+    
+    get a10() {return this.a[4]};
+    set a10(v){this.a[4] = v};
+    get a11() {return this.a[5]};
+    set a11(v){this.a[5] = v};
+    get a12() {return this.a[6]};
+    set a12(v){this.a[6] = v};
+    get a13() {return this.a[7]};
+    set a13(v){this.a[7] = v};
+    
+    get a20() {return this.a[8]};
+    set a20(v){this.a[8] = v};
+    get a21() {return this.a[9]};
+    set a21(v){this.a[9] = v};
+    get a22() {return this.a[10]};
+    set a22(v){this.a[10] = v};
+    get a23() {return this.a[11]};
+    set a23(v){this.a[11] = v};
+    
+    get a30() {return this.a[12]};
+    set a30(v){this.a[12] = v};
+    get a31() {return this.a[13]};
+    set a31(v){this.a[13] = v};
+    get a32() {return this.a[14]};
+    set a32(v){this.a[14] = v};
+    get a33() {return this.a[15]};
+    set a33(v){this.a[15] = v};
+    // Identity matrix
+    eqId() {
+        const o = this.a;
+        o[0] = 1.0; o[1] = 0.0; o[2] = 0.0; o[3] = 0.0;
+        o[4] = 0.0; o[5] = 1.0; o[6] = 0.0; o[7] = 0.0;
+        o[8] = 0.0; o[9] = 0.0; o[10] = 1.0; o[11] = 0.0;
+        o[12] = 0.0; o[13] = 0.0; o[14] = 0.0; o[15] = 1.0;
+        return this;
+    }
+    // Construct default instance - the identity
+    static Default() {
+        const a = new this.TYPE(this.SIZE);
+        a[0] = 1.0;
+        a[5] = 1.0;
+        a[10] = 1.0;
+        a[15] = 1.0;
+        return new this(a);
+    }
+    // Composition with an argument-specified matrix
+    eqComposeFrom(self,
+        b00,b01,b02,b03,
+        b10,b11,b12,b13,
+        b20,b21,b22,b23,
+        b30,b31,b32,b33,) {
+        const o = this.a, a = self.a;
+        const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
+              a10=a[4],a11=a[5],a12=a[6],a13=a[7],
+              a20=a[8],a21=a[9],a22=a[10],a23=a[11],
+              a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+        o[0] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30; //o00
+        o[1] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31; //o01
+        o[2] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32; //o02
+        o[3] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33; //o03
+        
+        o[4] = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30; //o10
+        o[5] = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31; //o11
+        o[6] = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32; //o12
+        o[7] = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33; //o13
+        
+        o[8] = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30; //o20
+        o[9] = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31; //o21
+        o[10]= a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32; //o22
+        o[11]= a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33; //o23
+        
+        o[12]= a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30; //o30
+        o[13]= a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31; //o31
+        o[14]= a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32; //o32
+        o[15]= a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33; //o33
+        return this;
+    }
+    // Matrix multiplication (composition of transformation)
+    eqCompose(self,other) {
+        const b = other.a;
+        return this.eqComposeFrom(self, 
+            b[0],b[1],b[2],b[3],
+            b[4],b[5],b[6],b[7],
+            b[8],b[9],b[10],b[11],
+            b[12],b[13],b[14],b[15],
+        );
+    }
+    // Determinant (equal to product of all eigenvalues)
+    determinant() {
+        const a = this.a;
+        const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
+              a10=a[4],a11=a[5],a12=a[6],a13=a[7],
+              a20=a[8],a21=a[9],a22=a[10],a23=a[11],
+              a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+        const b0 = a00 * a11 - a01 * a10;
+        const b1 = a00 * a12 - a02 * a10;
+        const b2 = a01 * a12 - a02 * a11;
+        const b3 = a20 * a31 - a21 * a30;
+        const b4 = a20 * a32 - a22 * a30;
+        const b5 = a21 * a32 - a22 * a31;
+        const b6 = a00 * b5 - a01 * b4 + a02 * b3;
+        const b7 = a10 * b5 - a11 * b4 + a12 * b3;
+        const b8 = a20 * b2 - a21 * b1 + a22 * b0;
+        const b9 = a30 * b2 - a31 * b1 + a32 * b0;
+
+        // Calculate the determinant
+        return a13 * b6 - a03 * b7 + a33 * b8 - a23 * b9;
+    }
+    // Adjugate
+    eqAdjugate(self) {
+        const o = this.a,a = self.a;
+        const a00=a[0],a01=a[1],a02=a[2],a03=a[3],
+              a10=a[4],a11=a[5],a12=a[6],a13=a[7],
+              a20=a[8],a21=a[9],a22=a[10],a23=a[11],
+              a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+
+        const b00 = a00 * a11 - a01 * a10;
+        const b01 = a00 * a12 - a02 * a10;
+        const b02 = a00 * a13 - a03 * a10;
+        const b03 = a01 * a12 - a02 * a11;
+        const b04 = a01 * a13 - a03 * a11;
+        const b05 = a02 * a13 - a03 * a12;
+        const b06 = a20 * a31 - a21 * a30;
+        const b07 = a20 * a32 - a22 * a30;
+        const b08 = a20 * a33 - a23 * a30;
+        const b09 = a21 * a32 - a22 * a31;
+        const b10 = a21 * a33 - a23 * a31;
+        const b11 = a22 * a33 - a23 * a32;
+
+        o[0] = a11 * b11 - a12 * b10 + a13 * b09;
+        o[1] = a02 * b10 - a01 * b11 - a03 * b09;
+        o[2] = a31 * b05 - a32 * b04 + a33 * b03;
+        o[3] = a22 * b04 - a21 * b05 - a23 * b03;
+        o[4] = a12 * b08 - a10 * b11 - a13 * b07;
+        o[5] = a00 * b11 - a02 * b08 + a03 * b07;
+        o[6] = a32 * b02 - a30 * b05 - a33 * b01;
+        o[7] = a20 * b05 - a22 * b02 + a23 * b01;
+        o[8] = a10 * b10 - a11 * b08 + a13 * b06;
+        o[9] = a01 * b08 - a00 * b10 - a03 * b06;
+        o[10] = a30 * b04 - a31 * b02 + a33 * b00;
+        o[11] = a21 * b02 - a20 * b04 - a23 * b00;
+        o[12] = a11 * b07 - a10 * b09 - a12 * b06;
+        o[13] = a00 * b09 - a01 * b07 + a02 * b06;
+        o[14] = a31 * b01 - a30 * b03 - a32 * b00;
+        o[15] = a20 * b03 - a21 * b01 + a22 * b00;
+        return this;
+    }
+});
+
 // Maps type name to the indirect array class that can store that type.
 const GL_TYPE_INDIRECT_ARRAYS = {
     BOOL : Vec1I,
@@ -798,8 +1114,8 @@ const GL_TYPE_INDIRECT_ARRAYS = {
     BYTE :  Vec1I,
     FLOAT : Vec1,
     FLOAT_MAT2 : Mat2,
-    FLOAT_MAT3 : null, // NOT IMPLEMENTED
-    FLOAT_MAT4 : null, // NOT IMPLEMENTED
+    FLOAT_MAT3 : Mat3,
+    FLOAT_MAT4 : Mat4,
     FLOAT_VEC2 : Vec2,
     FLOAT_VEC3 : Vec3,
     FLOAT_VEC4 : Vec4,
