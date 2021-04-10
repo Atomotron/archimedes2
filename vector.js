@@ -825,9 +825,9 @@ class Mat2 extends AbstractMatMixin(Vec4) {
     }
     // Rotate matrix. Compose with identity constructor to construct
     //                a new matrix.
-    eqRotate(self) {
+    /*eqRotate(self) {
         
-    }
+    }*/
     // Matrix multiplication (composition of transformation)
     eqCompose(self,other) {
         const b = other.a;
