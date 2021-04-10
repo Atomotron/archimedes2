@@ -40,7 +40,7 @@ Unsurprisingly, these are available depending on the dimensionality of the vecto
 
 
 // Tests are the best documentation, eh?
-function __testVectorCode() {
+function __testVectors() {
     function asserteq(a,b) {
         if (JSON.stringify(a) !== JSON.stringify(b)) {
             throw [a,"!==",b];
@@ -360,6 +360,25 @@ class AbstractVecN extends IndirectArray {
         const ratio = new_mag / mag;
         return this.eqMul(self,ratio);
     }
+    
+    // Produces a friendly string representation of the vector
+    toString() {
+        // Formats a square TypedArray matrix, as stored in this.a
+        const array = this.a;
+        const n = this.a.length;
+        let longest = 0;
+        const row = 
+            Array.from(array).map(x => {
+                const s = x.toFixed(3);
+                if (longest < s.length) longest = s.length;
+                return s;
+            });
+        const line = [];
+        for (const x of row) {
+            line.push(' '.repeat(1 + longest - x.length) + x);
+        }
+        return `Vec${n}[${line.join(',')}]`;
+    }
 });
 
 // A one-dimensional vector
@@ -458,6 +477,14 @@ class Vec2 extends AbstractVecN {
         const [a,b] = [this.a,other.a];
         return Math.fround(a[0] * b[0]) +
                Math.fround(a[1] * b[1]);
+    }
+    // Matrix transformation
+    eqTransform(self,matrix) {
+        const o = this.a, x = self.a, A = matrix.a;
+        const a00 = a[0],a01 = a[1],a10 = a[2],a11 = a[3];
+        o[0] = a00*x[0] + a01*x[1];
+        o[1] = a10*x[0] + a11*x[1];
+        return o;
     }
 });
 
@@ -616,34 +643,148 @@ class Vec4I extends AbstractVecN {
     static SIZE = 4;
 }
 
+/* 
+## Matrices
+Some code taken from [gl-matrix](https://github.com/toji/gl-matrix).
+
+### Matrix Element Naming Scheme
+
+Matrix elements are assigned numbers with the same indexing scheme [as is used on Wikipedia](https://en.wikipedia.org/wiki/Matrix_(mathematics)): `a23` is the element on row `2` and column `3`. When a vector is being transformed, row `i` of the input vector scales the whole column `a0i`,`a1i`,`a2i`... of the matrix. Row `j` of the output vector is built from the whole row `aj0`,`aj1`,`aj2`... of the matrix.
+
+Matrix elements can be accessed with index notation, like in the following:
+```javascript
+const A = Mat3.From(
+    1, 2, 3,
+   -4, 5, 6,
+   -7,-8 -9,
+);
+console.log(a21); // prints -8, from row 2 column 1
+```
+
+### Matrix Operations
+*/
+
+function __testMatrices() {
+    function asserteq(a,b) {
+        if (JSON.stringify(a) !== JSON.stringify(b)) {
+            throw [a,"!==",b];
+        }
+    }
+    // 2D Matrices
+    let A = Mat2.From(
+         0, -1,
+         1,  0,
+    );
+    let Ainv = A.inverse();
+    asserteq(Mat2.Id(), A.compose(Ainv));
+    // 3D Matrices
+    
+}
 
 // The abstract Matrix class is written as a mixin so that 
 // the matrix classes can extend both it and their corresponding
 // vector classes.
 const AbstractMatMixin = (Base) => generateVariantMethods(
-    class extends Base {
-        // Computes the inverse of the given matrix
-        eqInverse(self) {
-            const det = self.determinant();
-            if (det === 0.0) {
-                // Singular matrix
-                return this.eqZero();
-            }
-            this.eqAdjugate(self);
-            return this.mulEq(1.0 / det);
+class extends Base {
+    // Computes the inverse of the given matrix
+    eqInverse(self) {
+        const det = self.determinant();
+        if (det === 0.0) {
+            // Singular matrix
+            return this.eqZero();
         }
+        this.eqAdjugate(self);
+        return this.mulEq(1.0 / det);
     }
-);
-
+    toString() {
+        // Formats a square TypedArray matrix, as stored in this.a
+        const array = this.a;
+        const n = Math.sqrt(this.a.length);
+        const rows = [];
+        let longest = 0;
+        for (let row=0; row<n; ++row) {
+            const slice = Array.from(array.slice(n*row,n*(row+1)));
+            rows.push(
+                slice.map(x => {
+                    const s = x.toFixed(3);
+                    if (longest < s.length) longest = s.length;
+                    return s;
+                })
+            );
+        }
+        const lines = [`${n}×${n} Matrix`];
+        for (const row of rows) {
+            const line = [];
+            for (const x of row) {
+                line.push(' '.repeat(1 + longest - x.length) + x);
+            }
+            lines.push(`[${line.join(',')}]`);
+        }
+        return lines.join('\n');
+    }
+});
 
 // 2D Matrix type
 const Mat2 = generateVariantMethods(
 class Mat2 extends AbstractMatMixin(Vec4) {
+    get a00() {return this.a[0]};
+    set a00(v){this.a[0] = v};
+    get a01() {return this.a[1]};
+    set a01(v){this.a[1] = v};
+    get a10() {return this.a[2]};
+    set a10(v){this.a[2] = v};
+    get a11() {return this.a[3]};
+    set a11(v){this.a[3] = v};
     // Identity matrix
-    static eqI() {
+    eqId() {
         const o = this.a;
         o[0] = 1.0; o[1] = 0.0;
         o[2] = 0.0; o[3] = 1.0;
+        return this;
+    }
+    // Construct default instance - the identity
+    static Default() {
+        const a = new this.TYPE(this.SIZE);
+        a[0] = 1.0;
+        a[2] = 1.0;
+        return new this(a);
+    }
+    // Composition with an argument-specified matrix
+    eqComposeFrom(self,b00,b01,b10,b11) {
+        const o = this.a, a = self.a;
+        const a00 = a[0],a01 = a[1],a10 = a[2],a11 = a[3];
+        o[0] = a00 * b00 + a01 * b10; //o00
+        o[1] = a00 * b01 + a01 * b11; //o01
+        o[2] = a10 * b00 + a11 * b10; //o10
+        o[3] = a10 * b01 + a11 * b11; //o11
+        return this;
+    }
+    // Rotate matrix. Compose with identity constructor to construct
+    //                a new matrix.
+    eqRotate(self) {
+        
+    }
+    // Matrix multiplication (composition of transformation)
+    eqCompose(self,other) {
+        const b = other.a;
+        return this.eqComposeFrom(self, 
+            b[0],b[1],
+            b[2],b[3],
+        );        
+    }
+    // Determinant (equal to product of all eigenvalues)
+    determinant() {
+        const a = this.a;
+        return a[0] * a[3] - a[1] * a[2];
+    }
+    // Adjugate
+    eqAdjugate(self) {
+        const o = this.a,a = self.a;
+        const a0 = a[0];
+        o[0] = a[3];
+        o[1] = -a[1];
+        o[2] = -a[2];
+        o[3] = a0;
         return this;
     }
 });
@@ -656,7 +797,7 @@ const GL_TYPE_INDIRECT_ARRAYS = {
     BOOL_VEC4 : Vec4I,
     BYTE :  Vec1I,
     FLOAT : Vec1,
-    FLOAT_MAT2 : null, // NOT IMPLEMENTED
+    FLOAT_MAT2 : Mat2,
     FLOAT_MAT3 : null, // NOT IMPLEMENTED
     FLOAT_MAT4 : null, // NOT IMPLEMENTED
     FLOAT_VEC2 : Vec2,
@@ -678,4 +819,5 @@ const GL_TYPE_INDIRECT_ARRAYS = {
     UNSIGNED_SHORT : null,
 }
 
-__testVectorCode();
+__testVectors();
+__testMatrices();
