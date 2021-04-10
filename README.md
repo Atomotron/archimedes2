@@ -72,3 +72,28 @@ You can also, as appropriate for the number of dimensions, use x/y/z/w unit vect
 - `eqXhat, eqYhat, eqZhat, eqWhat` to set existing vectors to the unit vectors
 - `Vec4.Xhat(), Vec4.Yhat(), Vec4.Zhat(), Vec4.What()` to construct the unit vectors
 Unsurprisingly, these are available depending on the dimensionality of the vector class. (For example, `Vec2` has `eqXhat` and `eqYhat`).
+
+## Matrices
+Some code taken from [gl-matrix](https://github.com/toji/gl-matrix).
+
+### Matrix Element Naming Scheme
+
+Matrix elements are assigned numbers with the same indexing scheme [as is used on Wikipedia](https://en.wikipedia.org/wiki/Matrix_(mathematics)): `a23` is the element on row `2` and column `3`. When a vector is being transformed, row `i` of the input vector scales the whole column `a0i`,`a1i`,`a2i`... of the matrix. Row `j` of the output vector is built from the whole row `aj0`,`aj1`,`aj2`... of the matrix.
+
+Matrix elements can be accessed with index notation, like in the following:
+```javascript
+const A = Mat3.From(
+    1, 2, 3,
+   -4, 5, 6,
+   -7,-8 -9,
+);
+console.log(a21); // prints -8, from row 2 column 1
+```
+
+### Matrix Operations
+- eqCompose (compose with another matrix)
+- eqComposeFrom (compose from a matrix whose elements are passed in as arguments)
+- eqInverse (inverts the matrix)
+- eqAdjugate (computes matrix adjugate)
+- determinant (returns determinant)
+- All vector methods (eqAdd, eqSub, eqMul, dot, norm...)

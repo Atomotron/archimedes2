@@ -686,6 +686,12 @@ console.log(a21); // prints -8, from row 2 column 1
 ```
 
 ### Matrix Operations
+- eqCompose (compose with another matrix)
+- eqComposeFrom (compose from a matrix whose elements are passed in as arguments)
+- eqInverse (inverts the matrix)
+- eqAdjugate (computes matrix adjugate)
+- determinant (returns determinant)
+- All vector methods (eqAdd, eqSub, eqMul, dot, norm...)
 */
 
 function __testMatrices() {
