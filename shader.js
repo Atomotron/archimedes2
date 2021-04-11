@@ -1,4 +1,5 @@
-'use strict'
+import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
+import {GL_TYPES} from './webgltypes.js';
 /*
 Depends on:
 - `vector.js`
@@ -25,6 +26,7 @@ export class Shader {
         for (let i=0; i<nuniforms; ++i) {
             const info = gl.getActiveUniform(this.handle,i);
             const type = GL_TYPES[info.type];
+            console.log(i,info.name,type.nelements);
         }   
     }
     // Tell OpenGL to forget about this program.

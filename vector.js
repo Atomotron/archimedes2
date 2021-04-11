@@ -1,4 +1,7 @@
-'use strict'
+export {Vec1,Vec2,Vec3,Vec4,
+        Vec1I,Vec2I,Vec3I,Vec4I,
+        Mat2,Mat3,Mat4,};
+export {GL_TYPE_INDIRECT_ARRAYS};
 // The math of Euclidian space.
 // Heavy use of automatic code generation inside.
 
@@ -1143,3 +1146,5 @@ const GL_TYPE_INDIRECT_ARRAYS = {
 
 __testVectors();
 __testMatrices();
+
+

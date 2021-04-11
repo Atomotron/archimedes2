@@ -1,4 +1,3 @@
-'use strict'
 // WebGL Types
 // GL_TYPES is an object with one entry for each OpenGL type code.
 // Each entry has, as fields:
@@ -17,7 +16,7 @@
 
 // Test that GL_TYPES and GL_TYPE_CODES matches OpenGL
 // Must be given a webgl context in order to run.
-function GL_TYPES_test(gl) {
+export function GL_TYPES_test(gl) {
     for (const code in GL_TYPES) {
         if (''+gl[GL_TYPES[code].name] !== code) {
             console.error(`Mistake in GL_TYPES: Code ${code} is named ${GL_TYPES[code].name}, but gl[${GL_TYPES[code].name}] is ${gl[GL_TYPES[code].name]}.`);
@@ -31,7 +30,7 @@ function GL_TYPES_test(gl) {
 }
 
 
-const GL_TYPES = {
+export const GL_TYPES = {
      0x1400:{
         TypedArray : Int8Array,
         name : "BYTE",
@@ -187,7 +186,7 @@ const GL_TYPES = {
         uniformv : "uniform1iv",
      },
 }
-const GL_TYPE_CODES = {
+export const GL_TYPE_CODES = {
     BOOL : 0x8B56,
     BOOL_VEC2 : 0x8B57,
     BOOL_VEC3 : 0x8B58,
