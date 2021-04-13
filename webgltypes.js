@@ -1,3 +1,4 @@
+'use strict'
 // WebGL Types
 // GL_TYPES is an object with one entry for each OpenGL type code.
 // Each entry has, as fields:
@@ -33,6 +34,7 @@ export function GL_TYPES_test(gl) {
 export const GL_TYPES = {
      0x1400:{
         TypedArray : Int8Array,
+        is_sampler : false,
         name : "BYTE",
         nbytes : 1,
         nelements : 1,
@@ -40,6 +42,7 @@ export const GL_TYPES = {
      },
      0x1401:{
         TypedArray : Uint8Array,
+        is_sampler : false,
         name : "UNSIGNED_BYTE",
         nbytes : 1,
         nelements : 1,
@@ -47,6 +50,7 @@ export const GL_TYPES = {
      },
      0x1402:{
         TypedArray : Int16Array,
+        is_sampler : false,
         name : "SHORT",
         nbytes : 2,
         nelements : 1,
@@ -54,6 +58,7 @@ export const GL_TYPES = {
      },
      0x1403:{
         TypedArray : Uint16Array,
+        is_sampler : false,
         name : "UNSIGNED_SHORT",
         nbytes : 2,
         nelements : 1,
@@ -61,6 +66,7 @@ export const GL_TYPES = {
      },
      0x1404:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "INT",
         nbytes : 4,
         nelements : 1,
@@ -68,6 +74,7 @@ export const GL_TYPES = {
      },
      0x1405:{
         TypedArray : Uint32Array,
+        is_sampler : false,
         name : "UNSIGNED_INT",
         nbytes : 4,
         nelements : 1,
@@ -75,6 +82,7 @@ export const GL_TYPES = {
      },
      0x1406:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT",
         nbytes : 4,
         nelements : 1,
@@ -82,6 +90,7 @@ export const GL_TYPES = {
      },
      0x8B50:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT_VEC2",
         nbytes : 8,
         nelements : 2,
@@ -89,6 +98,7 @@ export const GL_TYPES = {
      },
      0x8B51:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT_VEC3",
         nbytes : 12,
         nelements : 3,
@@ -96,6 +106,7 @@ export const GL_TYPES = {
      },
      0x8B52:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT_VEC4",
         nbytes : 16,
         nelements : 4,
@@ -103,6 +114,7 @@ export const GL_TYPES = {
      },
      0x8B53:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "INT_VEC2",
         nbytes : 8,
         nelements : 2,
@@ -110,6 +122,7 @@ export const GL_TYPES = {
      },
      0x8B54:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "INT_VEC3",
         nbytes : 12,
         nelements : 3,
@@ -117,6 +130,7 @@ export const GL_TYPES = {
      },
      0x8B55:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "INT_VEC4",
         nbytes : 16,
         nelements : 4,
@@ -124,6 +138,7 @@ export const GL_TYPES = {
      },
      0x8B56:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "BOOL",
         nbytes : 4,
         nelements : 1,
@@ -131,6 +146,7 @@ export const GL_TYPES = {
      },
      0x8B57:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "BOOL_VEC2",
         nbytes : 8,
         nelements : 2,
@@ -138,6 +154,7 @@ export const GL_TYPES = {
      },
      0x8B58:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "BOOL_VEC3",
         nbytes : 12,
         nelements : 3,
@@ -145,6 +162,7 @@ export const GL_TYPES = {
      },
      0x8B59:{
         TypedArray : Int32Array,
+        is_sampler : false,
         name : "BOOL_VEC4",
         nbytes : 16,
         nelements : 4,
@@ -152,6 +170,7 @@ export const GL_TYPES = {
      },
      0x8B5A:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT_MAT2",
         nbytes : 16,
         nelements : 4,
@@ -159,6 +178,7 @@ export const GL_TYPES = {
      },
      0x8B5B:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT_MAT3",
         nbytes : 36,
         nelements : 9,
@@ -166,6 +186,7 @@ export const GL_TYPES = {
      },
      0x8B5C:{
         TypedArray : Float32Array,
+        is_sampler : false,
         name : "FLOAT_MAT4",
         nbytes : 64,
         nelements : 16,
@@ -173,6 +194,7 @@ export const GL_TYPES = {
      },
      0x8B5E:{
         TypedArray : Int32Array,
+        is_sampler : true,
         name : "SAMPLER_2D",
         nbytes : 4,
         nelements : 1,
@@ -180,6 +202,7 @@ export const GL_TYPES = {
      },
      0x8B60:{
         TypedArray : Int32Array,
+        is_sampler : true,
         name : "SAMPLER_CUBE",
         nbytes : 4,
         nelements : 1,

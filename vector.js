@@ -241,17 +241,15 @@ class IndirectArray {
     constructor(a) {
         this.a = a;
     }
-    // Check to see if another indirect array is binary-compatible with this one.
+    // Check to see if a typed array is binary-compatible with our type.
     // In other words, this ensures that it has the right size and type.
-    // A compatible indirect array can be used in all of the same uniform and
-    // attribute 
-    is_compatible(other) {
-        return other.a instanceof this.constructor.TYPE &&
-               other.a.length == this.constructor.SIZE;
+    is_compatible(array) {
+        return array instanceof this.constructor.TYPE &&
+               array.length == this.constructor.SIZE;
     }
     // Returns true iff this.a matches this.TYPE and this.SIZE.
     typecheck() {
-        return this.is_compatible(this);
+        return this.is_compatible(this.a);
     }    
     // Constructs an instance
     static Default() {

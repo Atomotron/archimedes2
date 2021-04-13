@@ -6,28 +6,108 @@ Depends on:
 - `webgltypes.js`
 */
 
+// For some reason, Javascript doesn't have this...
+// NOTE: ASSUMES COMPATIBLE TYPES AND LENGTHS
+function arrayEquals(a,b,b_offset=0) {
+    for (let i=0; i<a.length; ++i) {
+        if (a[i] !== b[i+b_offset]) return false;
+    }
+    return true;
+}
 
-// Shading program
+// Stores the attribute type information necessary to determine whether a vertex
+// array object is compatible with a shader.
+class AttributeSchema {
+    // Constructs a schema from an array of WebGLActiveInfo
+    constructor(infos) {
+        this.indices = new Map();
+        this.names = [];
+        this.type_codes = [];
+        for (const info of infos) {
+            this.indices.set(info.name,this.names.length);
+            this.names.push(info.name);
+            this.type_codes.push(info.type);
+            // OpenGL ES GLSL 1.0 section 4.3.3:
+            // "Attribute variables cannot be declared as arrays or structures."
+            console.assert(info.size === 1,"Attributes are never array types.");
+        }
+    }
+    toString() {
+        const lines = ['Attr.\tName\tGLType\tType Name'];
+        for (const [name,i] of this.indices) {
+            const typecode = this.type_codes[i];
+            const typename = GL_TYPES[typecode].name;
+            lines.push(`${i}\t${name}\t${typecode}\t${typename}`);
+        }
+        return lines.join('\n');
+    }
+}
+
+// A shader pipeline program
+// Contains uniforms because in the OpenGL specification,
+// shader program objects remember the uniforms you set on them
+// between invocations. That makes the shader object the natural
+// location for that state information.
 export class Shader {
-    // OpenGL type enum -> string mapping
-    // gl[TYPES[x]] == x, for all x in:
-    // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Constants#data_types
+    // Minimum maximums taken from:
+    // https://jdashg.github.io/misc/webgl/webgl-feature-levels.html
     constructor(gl,handle,name) {
         this.destroyed = false; // Has this shader been free'd?
         this.name = name;       // Name for debugging purposes
         this.handle = handle;   // OpenGL program handle
-        // Uncover shader inputs (uniforms and attributes)
+        /***** Attributes *****/
         const nattribs = gl.getProgramParameter(this.handle,gl.ACTIVE_ATTRIBUTES);
-        const nuniforms = gl.getProgramParameter(this.handle,gl.ACTIVE_UNIFORMS);
+        const attrinfos = [];
         for (let i=0; i<nattribs; ++i) {
-            const info = gl.getActiveAttrib(this.handle,i);
-            const type = GL_TYPES[info.type];
+            attrinfos.push(gl.getActiveAttrib(this.handle,i));
         }
+        this.attributeSchema = new AttributeSchema(attrinfos);
+        console.log(`${this.attributeSchema}`);
+        
+        /***** Uniforms *****/
+        const nuniforms = gl.getProgramParameter(this.handle,gl.ACTIVE_UNIFORMS);
+        this.uniforms = {}; // name -> uniform id
+        this.uniformNames = []; // uniform id -> name
+        this.uniformTypes = []; // Only used for debugging, but useful nonetheless.
+        this.bufferIds = []; // uniform id -> buffer id
+        this.bufferOffsets = []; // uniform id -> element offset in storage
+        this.buffers = []; // uniform storage buffers
+        this.uniformLocations = [];
+        this.dirtyFlags = []; // true|false, keep track of which buffers need to be uploaded
+        this.uniformv = []; // Pointers to gl uniformNv methods to call when uploading
+        const addUniform = (name,type,bufferid,offset) => {
+            const i = this.bufferIds.length; // convenient uniform counter
+            this.uniforms[name] = i;
+            this.uniformNames.push(name);
+            this.uniformTypes.push(type);
+            this.bufferIds.push(bufferid);
+            this.bufferOffsets.push(offset);
+        };
         for (let i=0; i<nuniforms; ++i) {
             const info = gl.getActiveUniform(this.handle,i);
             const type = GL_TYPES[info.type];
-            console.log(i,info.name,type.nelements);
-        }   
+            const current_buffer = this.buffers.length; // index of the buffer
+            this.buffers.push(
+                    // A buffer big enough for the whole array if size > 1,
+                    // or just the one thing, if size === 1.
+                    new type.TypedArray(type.nelements*info.size)
+            );
+            this.dirtyFlags.push(false);
+            this.uniformv.push(type.uniformv);
+            this.uniformLocations.push(gl.getUniformLocation(this.handle,info.name));
+            if (info.name.endsWith('[0]')) { // Array uniform
+                const basename = info.name.slice(0,-3); // remove [0]
+                // Iterate over every element of the uniform array
+                for (let array_index=0; array_index<info.size; ++array_index) {
+                    const name = `${basename}[${array_index}]`;
+                    addUniform(name,info.type,current_buffer,
+                        array_index*type.nelements);
+                }
+            } else { // Non-array uniforms
+                console.assert(info.size === 1,"Non-array uniform variables should have a size of 1, shouldn't they?");
+                addUniform(info.name,info.type,current_buffer,0);
+            }
+        }
     }
     // Tell OpenGL to forget about this program.
     destroy(gl) {
@@ -36,7 +116,60 @@ export class Shader {
         }
         gl.deleteProgram(this.handle);
     }
-    
+    // Returns true iff the given typed array is appropriate for uploading
+    // to the given uniform id
+    typecheck(id,typedArray) {
+        return typedArray instanceof GL_TYPES[this.uniformTypes[id]].TypedArray &&
+            typedArray.length === GL_TYPES[this.uniformTypes[id]].nelements;
+    }
+    // Copies the given data to the given uniform ID,
+    // updating the dirty flag if appropriate.
+    uniform(id,typedArray) {
+        const bufferId = this.bufferIds[id];
+        const buffer=this.buffers[bufferId],
+              offset=this.bufferOffsets[id],
+              dirty =this.dirtyFlags[bufferId];
+        // Update dirty flag iff it needs to be updated
+        if (!dirty) {
+            if (arrayEquals(typedArray,buffer,offset)) {
+                return; // Don't bother copying
+            } else {
+                this.dirtyFlags[bufferId] = true; // Flag as dirty
+            }
+        }
+        // Copy array data
+        buffer.set(typedArray,offset);
+    }
+    // Syncronizes stored uniform data with the GPU, according to
+    // which dirty flags are set.
+    sync(gl) {
+        for (let i=0; i<this.buffers.length; ++i) {
+            if (this.dirtyFlags[i]) {
+                gl[this.uniformv[i]](this.uniformLocations[i],this.buffers[i]);
+                this.dirtyFlags[i] = false; // We uploaded it, so it's no longer dirty.
+            }
+        }
+    }
+    // Debugging pretty-print
+    toString() { 
+        const lines = [`SHADER ${this.name}`];
+        if (this.bufferIds.length > 0) {
+            lines.push("Uniform\tBuffer\tOffset\tType Name\tName");
+            for (let i=0; i<this.bufferIds.length; ++i) {
+                lines.push(
+                    `${i}\t` +
+                    `${this.bufferIds[i]}\t` +
+                    `${this.bufferOffsets[i]}\t` + 
+                    `${GL_TYPES[this.uniformTypes[i]].name}\t` +
+                    `${this.uniformNames[i]}\t`
+                );
+            }
+        } else {
+            lines.push("(no uniforms)");
+        }
+        lines.push(this.attributeSchema.toString());
+        return lines.join('\n');
+    } 
 }
 // Returns an object full of `Shader`s, built from compiling the given sources.
 // Arguments:
@@ -112,7 +245,7 @@ export function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
     for (const [name,p] of programs) {
         if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
             console.error(`Error linking shader program "${name}":`);
-            console.error(gl.getShaderInfoLog(p));
+            console.error(gl.getProgramInfoLog(p));
             gl.deleteProgram(p); // Discard failed program
             programs.delete(name); // Drop our reference to it.
         }

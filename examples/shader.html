@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>AEⅡ Shader Demo</title>
+    <link rel="shortcut icon" href="../favicon.png" type="image/x-icon">
+    <script type="module" src="./shader.js"></script>
+</head>
+<body>
+
+<script id="shader-v" type="x-shader/x-vertex">
+#version 100
+#extension GL_OES_standard_derivatives : enable
+precision highp float;
+attribute vec2 vertex;
+uniform float time;
+void main() {
+    gl_Position = vec4(vertex,0.0,1.0); 
+}
+</script>
+
+<script id="shader-f" type="x-shader/x-fragment">
+#version 100
+#extension GL_OES_standard_derivatives : enable
+precision highp float;
+uniform float time;
+void main() {
+    vec2 p = gl_FragCoord.xy-vec2(256,256);
+    float r = length(p)*( sin(time)*0.5 + 0.5 )*0.05;
+    float f = (sin((r-time + atan(p.y,p.x))*3.0) / r)*1.5+0.5;
+    gl_FragColor = vec4(
+        vec3(1.0 * f,0.3,0.5) * f,
+        1.0
+    );
+}
+</script>
+
+<h1>Shaders</h1>
+<canvas id='canvas' width=512 height=512></canvas>
+
+</body>
+</html>

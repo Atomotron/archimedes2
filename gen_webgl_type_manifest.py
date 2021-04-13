@@ -24,7 +24,7 @@ HEADER = ''''use strict'
 
 // Test that GL_TYPES and GL_TYPE_CODES matches OpenGL
 // Must be given a webgl context in order to run.
-function GL_TYPES_test(gl) {
+export function GL_TYPES_test(gl) {
     for (const code in GL_TYPES) {
         if (''+gl[GL_TYPES[code].name] !== code) {
             console.error(`Mistake in GL_TYPES: Code ${code} is named ${GL_TYPES[code].name}, but gl[${GL_TYPES[code].name}] is ${gl[GL_TYPES[code].name]}.`);
@@ -86,29 +86,29 @@ When loading values for a uniform declared as a boolean, a boolean vector,an arr
 '''
 
 # Determine base types
-#   name              [kind,nelements,nbytes,constructor]
+#   name              [kind,nelements,nbytes,constructor,is_sampler]
 types = {
-    'BYTE'          : ['i',1,1,'Int8Array'],
-    'UNSIGNED_BYTE' : ['i',1,1,'Uint8Array'], 
-    'SHORT'         : ['i',1,2,'Int16Array'],
-    'UNSIGNED_SHORT': ['i',1,2,'Uint16Array'],
-    'INT'  	        : ['i',1,4,'Int32Array'],
-    'UNSIGNED_INT'  : ['i',1,4,'Uint32Array'],
-    'FLOAT'         : ['f',1,4,'Float32Array'],
+    'BYTE'          : ['i',1,1,'Int8Array', False],
+    'UNSIGNED_BYTE' : ['i',1,1,'Uint8Array',False], 
+    'SHORT'         : ['i',1,2,'Int16Array',False],
+    'UNSIGNED_SHORT': ['i',1,2,'Uint16Array',False],
+    'INT'  	        : ['i',1,4,'Int32Array',False],
+    'UNSIGNED_INT'  : ['i',1,4,'Uint32Array',False],
+    'FLOAT'         : ['f',1,4,'Float32Array',False],
     # See OpenGL ES 2.0 2.10.4 for why this can be an i32 array.
-    'BOOL'          : ['i',1,4,'Int32Array'],  
+    'BOOL'          : ['i',1,4,'Int32Array',False],  
     # When queried with getUniform, samplers will return a GLint,
     # which is signed.
     # [0]https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.10
-    'SAMPLER_2D'    : ['i',1,4,'Int32Array'],
-    'SAMPLER_CUBE'  : ['i',1,4,'Int32Array'],
+    'SAMPLER_2D'    : ['i',1,4,'Int32Array',True],
+    'SAMPLER_CUBE'  : ['i',1,4,'Int32Array',True],
 }
 def pow(signature,n): # Type theoretic exponentiation
-    kind,nelements,nbytes,constructor = signature
-    return [kind,nelements*n,nbytes*n,constructor]
+    kind,nelements,nbytes,constructor,is_sampler = signature
+    return [kind,nelements*n,nbytes*n,constructor,is_sampler]
 # Derived types
 types.update({
-    'FLOAT_VEC2'  :pow(types['FLOAT'],    2),
+    'FLOAT_VEC2'  :pow(types['FLOAT'],    2,),
     'FLOAT_VEC3'  :pow(types['FLOAT'],    3),
     'FLOAT_VEC4'  :pow(types['FLOAT'],    4),
     'INT_VEC2'    :pow(types['INT'],      2),
@@ -125,7 +125,7 @@ types.update({
     'FLOAT_MAT4'    :pow(types['FLOAT_VEC4'],    4),
 })
 def uniform_setter_name(name,signature):
-    kind,nelements,nbytes,constructor = signature
+    kind,nelements,nbytes,constructor,is_sampler = signature
     if "MAT" in name:
         sqrt_nelements = ({16:4,9:3,4:2})[nelements] # highest mat is mat4
         assert(kind == 'f') # only float matrices
@@ -142,6 +142,7 @@ gl_types = {
             'nbytes':     str(types[names[code]][2]),
             'TypedArray': str(types[names[code]][3]),
             'uniformv':   '"'+uniform_setter_name(names[code],types[names[code]])+'"',
+            'is_sampler': 'true' if types[names[code]][4] else 'false',
         }
     for code in names
 }
@@ -164,7 +165,7 @@ with open(OUTPUT_FILENAME,'w') as dst:
         return '{\n' + ''.join(lines) + '     '*indent + '}'
     blocks = []
     blocks.append(HEADER)
-    blocks.append('const GL_TYPES = '+jsformat(gl_types))
-    blocks.append('const GL_TYPE_CODES = '+jsformat(gl_type_codes))
+    blocks.append('export const GL_TYPES = '+jsformat(gl_types))
+    blocks.append('export const GL_TYPE_CODES = '+jsformat(gl_type_codes))
     blocks.append('\n')
     dst.write('\n'.join(blocks))
