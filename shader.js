@@ -6,40 +6,50 @@ Depends on:
 - `webgltypes.js`
 */
 
-// For some reason, Javascript doesn't have this...
-// NOTE: ASSUMES COMPATIBLE TYPES AND LENGTHS
-function arrayEquals(a,b,b_offset=0) {
-    for (let i=0; i<a.length; ++i) {
-        if (a[i] !== b[i+b_offset]) return false;
+// A name -> type code mapping that can work for uniforms or attributes.
+class Schema {
+    // Constructs a schema from an map of name -> OpenGL type code
+    constructor(types) {
+        this.schema = types; // name -> type code
     }
-    return true;
+    toString(kind='') {
+        const lines = [`GLType\tType Name\t${kind}Name`];
+        for (const [name,typecode] of this.schema) {
+            const typename = GL_TYPES[typecode].name;
+            lines.push(`${typecode}\t${typename}\t${name}`);
+        }
+        return lines.join('\n');
+    }
 }
 
 // Stores the attribute type information necessary to determine whether a vertex
 // array object is compatible with a shader.
-class AttributeSchema {
-    // Constructs a schema from an array of WebGLActiveInfo
-    constructor(infos) {
-        this.indices = new Map();
-        this.names = [];
-        this.type_codes = [];
-        for (const info of infos) {
-            this.indices.set(info.name,this.names.length);
-            this.names.push(info.name);
-            this.type_codes.push(info.type);
-            // OpenGL ES GLSL 1.0 section 4.3.3:
-            // "Attribute variables cannot be declared as arrays or structures."
-            console.assert(info.size === 1,"Attributes are never array types.");
+class AttributeSchema extends Schema {
+    // TODO: Typechecking against vertex array objects
+    toString() {
+        if (this.schema.size === 0) {
+            return '(no attributes)';
+        } else {
+            return super.toString('Attribute ');
         }
     }
+}
+
+// Stores the uniform type information necessary to determine whether
+// a set of TypedArray data sources is compatible with a shader
+class UniformSchema extends Schema {
+    // TODO: Typechecking against uniform structures
     toString() {
-        const lines = ['Attr.\tName\tGLType\tType Name'];
-        for (const [name,i] of this.indices) {
-            const typecode = this.type_codes[i];
-            const typename = GL_TYPES[typecode].name;
-            lines.push(`${i}\t${name}\t${typecode}\t${typename}`);
+        if (this.schema.size === 0) {
+            return '(no uniforms)';
+        } else {
+            return super.toString('Uniform ');
         }
-        return lines.join('\n');
+    }
+    // Returns the name of the context function appropriate for uploading
+    // the uniform with the given name.
+    uniformv(name) {
+        return GL_TYPES[this.schema.get(name)].uniformv;
     }
 }
 
@@ -48,66 +58,61 @@ class AttributeSchema {
 // shader program objects remember the uniforms you set on them
 // between invocations. That makes the shader object the natural
 // location for that state information.
+/*
+## Shader
+### Attributes
+- `program`: `WebGLProgram` handle to linked shader program.
+- `uniforms`: Object mapping name -> `WebGLUniformLocation`
+- `attributes`: Object mapping name -> attribute location (GLint)
+- `attributeSchema`: Attribute type info
+- `uniformSchema`: Uniform type info
+*/
 export class Shader {
     // Minimum maximums taken from:
     // https://jdashg.github.io/misc/webgl/webgl-feature-levels.html
-    constructor(gl,handle,name) {
+    constructor(gl,program,name) {
         this.destroyed = false; // Has this shader been free'd?
         this.name = name;       // Name for debugging purposes
-        this.handle = handle;   // OpenGL program handle
+        this.program = program; // OpenGL program handle
         /***** Attributes *****/
-        const nattribs = gl.getProgramParameter(this.handle,gl.ACTIVE_ATTRIBUTES);
-        const attrinfos = [];
+        const nattribs = gl.getProgramParameter(this.program,gl.ACTIVE_ATTRIBUTES);
+        const attrTypes = new Map();
+        this.attributes = {}; // name -> attrib location (GLint)
         for (let i=0; i<nattribs; ++i) {
-            attrinfos.push(gl.getActiveAttrib(this.handle,i));
+            const info = gl.getActiveAttrib(this.program,i);
+            attrTypes.set(info.name,info.type);
+            this.attributes[info.name] = gl.getAttribLocation(this.program,info.name);
         }
-        this.attributeSchema = new AttributeSchema(attrinfos);
-        console.log(`${this.attributeSchema}`);
+        this.attributeSchema = new AttributeSchema(attrTypes);
         
         /***** Uniforms *****/
-        const nuniforms = gl.getProgramParameter(this.handle,gl.ACTIVE_UNIFORMS);
-        this.uniforms = {}; // name -> uniform id
-        this.uniformNames = []; // uniform id -> name
-        this.uniformTypes = []; // Only used for debugging, but useful nonetheless.
-        this.bufferIds = []; // uniform id -> buffer id
-        this.bufferOffsets = []; // uniform id -> element offset in storage
-        this.buffers = []; // uniform storage buffers
-        this.uniformLocations = [];
-        this.dirtyFlags = []; // true|false, keep track of which buffers need to be uploaded
-        this.uniformv = []; // Pointers to gl uniformNv methods to call when uploading
-        const addUniform = (name,type,bufferid,offset) => {
-            const i = this.bufferIds.length; // convenient uniform counter
-            this.uniforms[name] = i;
-            this.uniformNames.push(name);
-            this.uniformTypes.push(type);
-            this.bufferIds.push(bufferid);
-            this.bufferOffsets.push(offset);
-        };
+        const nuniforms = gl.getProgramParameter(this.program,gl.ACTIVE_UNIFORMS);
+        const uniformTypes = new Map();
+        this.uniforms = {}; // name -> webgl uniform handle (WebGLUniformLocation)
         for (let i=0; i<nuniforms; ++i) {
-            const info = gl.getActiveUniform(this.handle,i);
-            const type = GL_TYPES[info.type];
-            const current_buffer = this.buffers.length; // index of the buffer
-            this.buffers.push(
-                    // A buffer big enough for the whole array if size > 1,
-                    // or just the one thing, if size === 1.
-                    new type.TypedArray(type.nelements*info.size)
-            );
-            this.dirtyFlags.push(false);
-            this.uniformv.push(type.uniformv);
-            this.uniformLocations.push(gl.getUniformLocation(this.handle,info.name));
-            if (info.name.endsWith('[0]')) { // Array uniform
+            const info = gl.getActiveUniform(this.program,i);
+            // Deconstruct arrays into separate locations
+            if (info.name.endsWith('[0]')) {
                 const basename = info.name.slice(0,-3); // remove [0]
-                // Iterate over every element of the uniform array
-                for (let array_index=0; array_index<info.size; ++array_index) {
-                    const name = `${basename}[${array_index}]`;
-                    addUniform(name,info.type,current_buffer,
-                        array_index*type.nelements);
+                for (let i=0; i<info.size; ++i) {
+                    // For every index in the array...
+                    const element_name = `${basename}[${i}]`;
+                    const element_type = info.type;
+                    const element_handle = gl.getUniformLocation(this.program,element_name);
+                    uniformTypes.set(element_name,element_type);
+                    this.uniforms[element_name] = element_handle;
                 }
-            } else { // Non-array uniforms
-                console.assert(info.size === 1,"Non-array uniform variables should have a size of 1, shouldn't they?");
-                addUniform(info.name,info.type,current_buffer,0);
+            } else {
+                // It's not an array uniform, so there's no need to deconstruct it.
+                console.assert(
+                    info.size===1,
+                    "I think uniform names not ending in `[0]` must have a size of 1."
+                );
+                uniformTypes.set(info.name,info.type);
+                this.uniforms[info.name] = gl.getUniformLocation(this.program,info.name);
             }
         }
+        this.uniformSchema = new UniformSchema(uniformTypes);
     }
     // Tell OpenGL to forget about this program.
     destroy(gl) {
@@ -116,58 +121,19 @@ export class Shader {
         }
         gl.deleteProgram(this.handle);
     }
-    // Returns true iff the given typed array is appropriate for uploading
-    // to the given uniform id
-    typecheck(id,typedArray) {
-        return typedArray instanceof GL_TYPES[this.uniformTypes[id]].TypedArray &&
-            typedArray.length === GL_TYPES[this.uniformTypes[id]].nelements;
+    // Dynamically upload `typedArray` to uniform `name`
+    uniform(gl,name,typedArray) {
+        gl[this.uniformSchema.uniformv(name)](this.uniforms[name], typedArray);
     }
-    // Copies the given data to the given uniform ID,
-    // updating the dirty flag if appropriate.
-    uniform(id,typedArray) {
-        const bufferId = this.bufferIds[id];
-        const buffer=this.buffers[bufferId],
-              offset=this.bufferOffsets[id],
-              dirty =this.dirtyFlags[bufferId];
-        // Update dirty flag iff it needs to be updated
-        if (!dirty) {
-            if (arrayEquals(typedArray,buffer,offset)) {
-                return; // Don't bother copying
-            } else {
-                this.dirtyFlags[bufferId] = true; // Flag as dirty
-            }
-        }
-        // Copy array data
-        buffer.set(typedArray,offset);
-    }
-    // Syncronizes stored uniform data with the GPU, according to
-    // which dirty flags are set.
-    sync(gl) {
-        for (let i=0; i<this.buffers.length; ++i) {
-            if (this.dirtyFlags[i]) {
-                gl[this.uniformv[i]](this.uniformLocations[i],this.buffers[i]);
-                this.dirtyFlags[i] = false; // We uploaded it, so it's no longer dirty.
-            }
-        }
+    // Dynamically attach this shader to the context
+    use(gl) {
+        gl.useProgram(this.program);
     }
     // Debugging pretty-print
     toString() { 
         const lines = [`SHADER ${this.name}`];
-        if (this.bufferIds.length > 0) {
-            lines.push("Uniform\tBuffer\tOffset\tType Name\tName");
-            for (let i=0; i<this.bufferIds.length; ++i) {
-                lines.push(
-                    `${i}\t` +
-                    `${this.bufferIds[i]}\t` +
-                    `${this.bufferOffsets[i]}\t` + 
-                    `${GL_TYPES[this.uniformTypes[i]].name}\t` +
-                    `${this.uniformNames[i]}\t`
-                );
-            }
-        } else {
-            lines.push("(no uniforms)");
-        }
         lines.push(this.attributeSchema.toString());
+        lines.push(this.uniformSchema.toString());
         return lines.join('\n');
     } 
 }
@@ -324,7 +290,8 @@ function prettyPrintShaderError(name,source,error) {
     // Attempt to find the error-triggering string in the bad line
     // Strip whitespace and wrapping quotes
     const triggering = errorParts[3].replace(/^\s+['|"]|['|"]\s+$/g, '');
-    const triggering_index = lines[line].search(triggering);
+    console.log(lines,line,triggering);
+    const triggering_index = lines[line].indexOf(triggering);
     // Probe for missing semicolons, a common error.
     // This regex-based heuristic is NOT PERFECT, but it can work sometimes.
     let semicolon_missing_at = null;

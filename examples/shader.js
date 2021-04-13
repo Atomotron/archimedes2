@@ -94,11 +94,14 @@ if (gl !== null) {
     gl.bufferData(gl.ARRAY_BUFFER, square_verts, gl.STATIC_DRAW);
     
     // Enable shader
-    gl.useProgram(shader.handle);
-    const vertex_loc = gl.getAttribLocation(shader.handle,'vertex');
-    gl.enableVertexAttribArray(vertex_loc);
-    gl.vertexAttribPointer(vertex_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(shader.attributes.vertex);
+    gl.vertexAttribPointer(shader.attributes.vertex, 2, gl.FLOAT, false, 0, 0);
     
+    // Set spiral centers
+    shader.use(gl);
+    shader.uniform(gl,'centers[0]',Vec2.From(200,200).a);
+    shader.uniform(gl,'centers[1]',Vec2.From(-200,200).a);
+    shader.uniform(gl,'centers[2]',Vec2.From(0,-200).a);
     // Create vec
     const time = Vec1.From(0.0);
     (function tick(t_ms) {
@@ -106,9 +109,8 @@ if (gl !== null) {
             time.eqFrom(t_ms * 0.001);
             // Oscillate blue channel
             // Prepare target
-            gl.useProgram(shader.handle);
-            shader.uniform(shader.uniforms.time, time.a);
-            shader.sync(gl);
+            shader.use(gl);
+            shader.uniform(gl,'time',time.a);
             
             // Arrays
             gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
