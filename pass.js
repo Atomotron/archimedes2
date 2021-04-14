@@ -107,6 +107,7 @@ function typecheckDepointerize(passes) {
                 if (typeof x[name] === shape[name]) continue;
             }
             console.error(x,`has wrong type on ${name}: should be`,shape[name]);
+            good = false;
         }
         return good;
     }
