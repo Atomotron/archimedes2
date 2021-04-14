@@ -2,6 +2,7 @@
 
 import {GL_TYPES_test} from '../webgltypes.js';
 import {Shader, compileShaders} from '../shader.js';
+import {compileRenderer} from '../pass.js';
 import {Vec1,Vec2,Vec3,Vec4,
         Vec1I,Vec2I,Vec3I,Vec4I,
         Mat2,Mat3,Mat4} from '../vector.js';
@@ -97,23 +98,30 @@ if (gl !== null) {
     gl.enableVertexAttribArray(shader.attributes.vertex);
     gl.vertexAttribPointer(shader.attributes.vertex, 2, gl.FLOAT, false, 0, 0);
     
-    // Set spiral centers
-    shader.use(gl);
-    shader.uniform(gl,'centers[0]',Vec2.From(200,200).a);
-    shader.uniform(gl,'centers[1]',Vec2.From(-200,200).a);
-    shader.uniform(gl,'centers[2]',Vec2.From(0,-200).a);
     // Create vec
     const time = Vec1.From(0.0);
+    
+    // Render environment
+    const sequence = [
+        {   name:"Pass 1",
+            shader:shader,
+            uniforms: {
+                'time': time,
+                'centers[0]': Vec2.From(200,200),
+                'centers[1]': Vec2.From(-200,200),
+                'centers[2]': Vec2.From(0,-200),
+            },
+            draw: (gl) => {
+                gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+            },
+        },
+    ];
+    const [render,env] = compileRenderer(sequence);
+    
     (function tick(t_ms) {
         if (t_ms !== null) {
             time.eqFrom(t_ms * 0.001);
-            // Oscillate blue channel
-            // Prepare target
-            shader.use(gl);
-            shader.uniform(gl,'time',time.a);
-            
-            // Arrays
-            gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+            render(gl,env);            
         }
         window.requestAnimationFrame(tick);
     })(null);

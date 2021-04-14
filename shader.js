@@ -46,6 +46,14 @@ class UniformSchema extends Schema {
             return super.toString('Uniform ');
         }
     }
+    // Returns type of the given uniform
+    type(name) {
+        return this.schema.get(name);
+    }
+    // Returns true iff the given uniform is present
+    has(name) {
+        return this.schema.has(name);
+    }
     // Returns the name of the context function appropriate for uploading
     // the uniform with the given name.
     uniformv(name) {
@@ -120,6 +128,14 @@ export class Shader {
             throw `Can't destroy shader ${this.name}; it is already destroyed.`;
         }
         gl.deleteProgram(this.handle);
+    }
+    // Returns true iff the given uniform should be uploaded to this shader
+    hasUniform(name) {
+        return this.uniformSchema.has(name);
+    }
+    // Returns the GL type code of the given uniform
+    type(name) {
+        return this.uniformSchema.type(name);
     }
     // Dynamically upload `typedArray` to uniform `name`
     uniform(gl,name,typedArray) {
