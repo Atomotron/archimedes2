@@ -137,14 +137,6 @@ export class Shader {
     type(name) {
         return this.uniformSchema.type(name);
     }
-    // Dynamically upload `typedArray` to uniform `name`
-    uniform(gl,name,typedArray) {
-        gl[this.uniformSchema.uniformv(name)](this.uniforms[name], typedArray);
-    }
-    // Dynamically attach this shader to the context
-    use(gl) {
-        gl.useProgram(this.program);
-    }
     // Debugging pretty-print
     toString() { 
         const lines = [`SHADER ${this.name}`];
