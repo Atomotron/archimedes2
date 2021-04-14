@@ -103,7 +103,7 @@ if (gl !== null) {
     
     // Render environment
     const sequence = [
-        {   name:"Pass 1",
+        {   name:"Swirl",
             shader:shader,
             uniforms: {
                 'time': time,

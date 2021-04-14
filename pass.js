@@ -260,7 +260,7 @@ class PassRecorder {
                         if (buffer.length !== GL_TYPES[type].nelements) {
                             good = false;
                             log(`Uniform ${uniform_name} set to an array ` +
-                            `with ${buffer.length} elements, but it needs` + 
+                            `with ${buffer.length} elements, but it needs ` + 
                             `${GL_TYPES[type].nelements}.`);
                             continue;
                         }
@@ -323,7 +323,7 @@ export function compileRenderer(sequence) {
     const dud = new Function('gl','env',''); // function that does nothing
     // Compile sequence
     if (!typecheckDepointerize(sequence)) {
-        return dud;
+        return [dud,{}];
     }
     const [depointerized,env] = depointerize(sequence);
     const rec = new PassRecorder();
