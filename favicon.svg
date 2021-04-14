@@ -51,7 +51,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -74,23 +74,17 @@
        sodipodi:nodetypes="ccccccc"
        inkscape:transform-center-x="9.0387874"
        inkscape:transform-center-y="0.16441373" />
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-weight:normal;font-size:26.9144px;line-height:1.25;font-family:sans-serif;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.672864"
-       x="93.132828"
-       y="99.900108"
+    <g
+       aria-label="A
+"
+       transform="rotate(0.86683253)"
        id="text1202"
-       transform="rotate(0.86683253)"><tspan
-         sodipodi:role="line"
-         id="tspan1200"
-         x="93.132828"
-         y="99.900108"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:'Liberation Serif';-inkscape-font-specification:'Liberation Serif';fill:#000000;fill-opacity:1;stroke-width:0.672864">A</tspan><tspan
-         sodipodi:role="line"
-         x="93.132828"
-         y="133.54311"
+       style="font-style:normal;font-weight:normal;font-size:26.9144px;line-height:1.25;font-family:sans-serif;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.672864">
+      <path
+         d="m 99.191196,99.203593 v 0.696515 h -5.795532 v -0.696515 l 1.997553,-0.354828 6.005803,-16.716366 h 2.49694 l 6.24235,16.716366 2.23411,0.354828 v 0.696515 h -7.4514 v -0.696515 l 2.36552,-0.354828 -1.74786,-5.085876 h -6.938865 l -1.774142,5.085876 z m 2.825484,-15.178775 -3.022611,8.555309 h 6.137221 z"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:'Liberation Serif';-inkscape-font-specification:'Liberation Serif';fill:#000000;fill-opacity:1;stroke-width:0.672864"
-         id="tspan1204" /></text>
+         id="path1671" />
+    </g>
     <path
        style="fill:#d9ca26;fill-opacity:1;stroke:none;stroke-width:0.335111px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        d="m 94.335896,86.325123 2.66822,-0.941549 4.874514,2.360469 4.81979,4.54979 2.47239,3.939315 5.26031,-3.349867 1.625,-5.224865 -4.74994,0.771772 1.62352,-5.072404 -5.97562,-0.165826 0.15862,-4.141196 -6.71115,1.47264 2.61841,-1.93276 -5.182437,2.701349 z"
