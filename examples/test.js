@@ -135,6 +135,20 @@ if (gl !== null) {
             time.eqFrom(t_ms * 0.001);
             render(gl,env);            
         }
+        //https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
+        // Lookup the size the browser is displaying the canvas in CSS pixels.
+        const displayWidth  = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+
+        // Check if the canvas is not the same size.
+        const needResize = canvas.width  !== displayWidth ||
+                         canvas.height !== displayHeight;
+
+        if (needResize) {
+        // Make the canvas the same size
+        canvas.width  = displayWidth;
+        canvas.height = displayHeight;
+        }
         window.requestAnimationFrame(tick);
     })(null);
 }

@@ -32,6 +32,8 @@ Every pixel-writable image, i.e. every handle object that can be
 attached as an interface, has the following three attributes set:
 
 -   hasFramebuffer = true
+-   width = width in pixels
+-   height = height in pixels
 -   hasDepthstencil = true | false
 -   framebuffer = a WebGLFramebuffer
 -   hasTexture = true | false (see above)
@@ -201,6 +203,7 @@ export class Texture {
 // interface (with hasFramebuffer = true, and so on.)
 export class CanvasRenderbuffer {
     constructor(gl) {
+        this.gl = gl; // Normally we don't do this, but this is our only handle.
         this.hasFramebuffer = true;
         this.hasTexture = false;
         this.framebuffer = null; // This signifies the canvas RB
@@ -215,6 +218,12 @@ export class CanvasRenderbuffer {
         //       is created with depth but no stencil or stencil
         //       with no depth.
         this.hasDepthstencil = info.depth && info.stencil;
+    }
+    get width() {
+        return this.gl.drawingBufferWidth;
+    }
+    get height() {
+        return this.gl.drawingBufferHeight;
     }
 }
 

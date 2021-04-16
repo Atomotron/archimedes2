@@ -5,6 +5,19 @@
     <title>AEⅡ Shader Demo</title>
     <link rel="shortcut icon" href="../favicon.png" type="image/x-icon">
     <script type="module" src="./test.js"></script>
+    
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+      }
+      /* make the canvas fill its container */
+      #canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+    </style>
 </head>
 <body>
 
@@ -42,10 +55,8 @@ void main() {
     gl_FragColor = vec4(color,1.0);
 }
 </script>
-
-<h1>Shader Demo</h1>
 <canvas id='canvas' width=512 height=512></canvas>
-<img id='tex' src="./tools-861x599-martin-vorel.jpg" alt="texture image"></img>
+<img id='tex' src="./tools-861x599-martin-vorel.jpg" alt="texture image" style="display:none;"></img>
 
 </body>
 </html>

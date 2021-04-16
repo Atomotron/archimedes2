@@ -249,6 +249,8 @@ class PassRecorder {
         this.lines = [// Lines of code built up to execute function.
         // Variable to store current shader object
         "let shader = null;",
+        // Variable to store current framebuffer
+        "let framebuffer = null;",
         ]; 
         // State information
         this.framebuffer = null; // name of bound framebuffer
@@ -362,9 +364,20 @@ class PassRecorder {
             // Swap framebuffers if needed
             if (pass.framebuffer !== this.framebuffer) {
                 if (pass.framebuffer === "CANVAS") {
+                    l.push(`framebuffer = null;`);
                     l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,null); // Default (canvas) framebuffer`);
+                    l.push(`gl.viewport(0,0,`+
+                           `gl.drawingBufferWidth,gl.drawingBufferHeight);`);
+                    l.push(`gl.scissor(0,0,`+
+                           `gl.drawingBufferWidth,gl.drawingBufferHeight);`);
                 } else {
-                    l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,env.framebuffers[${jsString(pass.framebuffer)}].framebuffer);`);
+                    l.push(`framebuffer = env.framebuffers[${
+                            jsString(pass.framebuffer)}].framebuffer;`);
+                    l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);`);
+                    l.push(`gl.viewport(0,0,`+
+                           `framebuffer.width,framebuffer.height);`);
+                    l.push(`gl.scissor(0,0,`+
+                           `framebuffer.width,framebuffer.height);`);
                 }   
             }
             // Swap shaders if needed
