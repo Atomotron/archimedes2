@@ -6,6 +6,41 @@ Depends on:
 - `webgltypes.js`
 */
 
+
+// djb2 (dan bernstein)
+// http://www.cse.yorku.ca/~oz/hash.html
+function hash(string) {
+    let hash = new Uint32Array(1); // seed
+    for (let i=0; i<string.length; ++i) {
+        const c = string.charCodeAt(i);
+        // Faster in JS than the bitshift trick,
+        // according to unscientific profiling
+        hash[0] = hash[0]*33 + c;
+    }
+    return hash[0];
+}
+
+// Assign samplers to image units based on sampler name string hash
+function assignImageUnits(samplers,max_units) {
+    if (samplers.length > max_units) 
+        throw "Attempting to assign more textures than image units.";
+    const units = new Map(); // number -> name
+    for (const sampler of samplers) {
+        let x = hash(sampler);
+        // Increment x until we find an unused slot.
+        while (units.has(x % max_units)) 
+            x += 1;
+        // Now that x is unused, save it.
+        units.set(x % max_units,sampler);
+    }
+    // Reverse map direction
+    const assignments = new Map();
+    for (const [unit,sampler] of units) {
+        assignments.set(sampler,unit);
+    }
+    return assignments;
+}
+
 // A name -> type code mapping that can work for uniforms or attributes.
 class Schema {
     // Constructs a schema from an map of name -> OpenGL type code
@@ -68,9 +103,17 @@ class UniformSchema extends Schema {
 // location for that state information.
 /*
 ## Shader
+
+A non-normative note in the WebGL 1.0 spec says:
+"Performance problems have been observed on some implementations when using uniform1i to update sampler uniforms. To change the texture referenced by a sampler uniform, binding a new texture to the texture unit referenced by the uniform should be preferred over using uniform1i to update the uniform itself."
+
+Consequently, the samplers are fixed to automatically chosen texture image
+units at load time.
+
 ### Attributes
 - `program`: `WebGLProgram` handle to linked shader program.
 - `uniforms`: Object mapping name -> `WebGLUniformLocation`
+- `samplers`: Object mapping name -> texture image unit assignment
 - `attributes`: Object mapping name -> attribute location (GLint)
 - `attributeSchema`: Attribute type info
 - `uniformSchema`: Uniform type info
@@ -97,8 +140,10 @@ export class Shader {
         const nuniforms = gl.getProgramParameter(this.program,gl.ACTIVE_UNIFORMS);
         const uniformTypes = new Map();
         this.uniforms = {}; // name -> webgl uniform handle (WebGLUniformLocation)
+        const samplerUniforms = new Map(); // name -> sampler uniform handle
         for (let i=0; i<nuniforms; ++i) {
             const info = gl.getActiveUniform(this.program,i);
+            const isSampler = GL_TYPES[info.type].is_sampler;
             // Deconstruct arrays into separate locations
             if (info.name.endsWith('[0]')) {
                 const basename = info.name.slice(0,-3); // remove [0]
@@ -106,9 +151,13 @@ export class Shader {
                     // For every index in the array...
                     const element_name = `${basename}[${i}]`;
                     const element_type = info.type;
-                    const element_handle = gl.getUniformLocation(this.program,element_name);
+                    const element_handle =              
+                        gl.getUniformLocation(this.program,element_name);
                     uniformTypes.set(element_name,element_type);
-                    this.uniforms[element_name] = element_handle;
+                    if (isSampler)
+                        samplerUniforms.set(element_name,element_handle);
+                    else
+                        this.uniforms[element_name] = element_handle;
                 }
             } else {
                 // It's not an array uniform, so there's no need to deconstruct it.
@@ -117,10 +166,27 @@ export class Shader {
                     "I think uniform names not ending in `[0]` must have a size of 1."
                 );
                 uniformTypes.set(info.name,info.type);
-                this.uniforms[info.name] = gl.getUniformLocation(this.program,info.name);
+                const uniform_handle =              
+                    gl.getUniformLocation(this.program,info.name);
+                if (isSampler)
+                    samplerUniforms.set(info.name,uniform_handle);
+                else
+                    this.uniforms[info.name] = uniform_handle;
             }
         }
         this.uniformSchema = new UniformSchema(uniformTypes);
+        /***** Samplers *****/
+        const nImageUnits = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+        // name -> fixed image unit number
+        this.samplers = assignImageUnits(
+            Array.from(samplerUniforms.keys()),
+            nImageUnits
+        );
+        // Set uniform values, which will be remembered for the shader's life.
+        gl.useProgram(this.program);
+        for (const [name,unit] of this.samplers) {
+            gl.uniform1i(samplerUniforms.get(name),unit);
+        }
     }
     // Tell OpenGL to forget about this program.
     destroy(gl) {
@@ -142,6 +208,10 @@ export class Shader {
         const lines = [`SHADER ${this.name}`];
         lines.push(this.attributeSchema.toString());
         lines.push(this.uniformSchema.toString());
+        lines.push("Sampler Image Unit Asignments");
+        for (const [name,unit] of this.samplers) {
+            lines.push(`unit ${unit} assigned to\t${name}`);
+        }
         return lines.join('\n');
     } 
 }

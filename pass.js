@@ -13,7 +13,8 @@ import {Shader} from './shader.js';
         program: WebGLProgram,
         uniforms: {uniform1: WebGLUniformLocation, ...},
       }, ...},
-      framebuffers: {framebuffer name: (see Image.js)}
+      framebuffers: {framebuffer name: framebuffer (see Image.js)}
+      textures: {texture name: texture (see Image.js)}
       // IndirectArrays for uploading to uniforms
       variables: {uniform1: {a: typed array}, ...},
       // Functions to call when a pass is ready
@@ -26,6 +27,7 @@ import {Shader} from './shader.js';
       name: pass name
       framebuffer: framebuffer name
       callback: callback name
+      samplers: Map<image unit # -> texture name>
       // Shader and uniform handles
       shader: shader name,
       uniforms: Map<uniform name -> variable name>,
@@ -114,32 +116,66 @@ function typecheckDepointerize(passes) {
         return good;
     }
     const SHAPE = {
-        name: "string",
-        shader: "?object",
-        framebuffer: "?object",
-        uniforms: "?object",
-        draw: "function",
+        name:       "string",
+        shader:     "?object",
+        framebuffer:"?object",
+        uniforms:   "?object",
+        samplers:   "?object",
+        draw:       "function",
     }
     let good = true;
     for (const pass of passes) {
         const good_shape = shapeCheck(pass,SHAPE);
         good &&= good_shape;
-        if (good_shape) {
-            // Typecheck uniform/shader uniform correspondence
-            for (const name in pass.shader.uniforms) {
-                const value = pass.uniforms[name];
-                if (typeof value === "undefined") {
-                    good = false;
-                    console.error('Pass',pass.name,'missing required uniform',
-                                  name);
-                    continue;
-                }
-            }
-            // Make sure that the framebuffer is actually a framebuffer
-            if (!pass.framebuffer.hasFramebuffer) {
+        if (!good_shape) continue;
+        // Make sure the shader is actually a shader
+        if (!pass.shader instanceof Shader) {
+            good = false;
+            console.error('Pass',pass.name,'does not have a Shader set as its',
+            'shader. Instead, it has:',pass.shader);
+            continue;
+        }
+        
+        // Typecheck uniform/shader uniform correspondence
+        for (const name in pass.shader.uniforms) {
+            if (typeof pass.uniforms[name] === "undefined") {
                 good = false;
-                console.error('Pass',pass.name,'framebuffer set to',
-                'something that isn\'t a framebuffer:',pass.framebuffer);
+                console.error('Pass',pass.name,'missing required uniform:',
+                              name);
+                continue;
+            }
+        }
+        // Make sure that the framebuffer is actually a framebuffer
+        if (!pass.framebuffer.hasFramebuffer) {
+            good = false;
+            console.error('Pass',pass.name,'framebuffer set to',
+            'something that isn\'t a framebuffer:',pass.framebuffer);
+        }
+        // Make sure all the textures are actually textures, and that
+        // none of them are the framebuffer.
+        for (const sampler in pass.samplers) {
+            const texture = pass.samplers[sampler];
+            if (texture === pass.framebuffer) {
+                good = false;
+                console.error("Pass",pass.name,"has its own render target",
+                "assigned to sampler:",sampler);
+                continue;
+            }
+            if (!texture.hasTexture) {
+                good = false;
+                console.error('Pass',pass.name,'sampler',sampler,'set to',
+                'something that isn\'t a texture:',texture);
+                continue;
+            }
+        }
+        // Make sure that all of the samplers in the shader
+        // are set by the pass. (Analouge of uniform check above.)
+        for (const [sampler,unit] of pass.shader.samplers) {
+            if (typeof pass.samplers[sampler] === "undefined") {
+                good = false;
+                console.error('Pass',pass.name,'missing required sampler:',
+                              sampler);
+                continue;
             }
         }
     }
@@ -152,6 +188,7 @@ function typecheckDepointerize(passes) {
 function depointerize(passes) {
     const shaders   = new Deduplicator(),
           variables = new Deduplicator(),
+          textures  = new Deduplicator(),
           framebuffers = new Deduplicator(),
           callbacks = new Deduplicator();
     // Special value that flags default canvas
@@ -161,6 +198,7 @@ function depointerize(passes) {
     for (const pass of passes) {
         const shaderName = shaders.add(pass.shader,pass.shader.name);
         const callbackName = callbacks.add(pass.draw,pass.name);
+        // UNIFORMS
         const uniforms = new Map();
         const uniformTypes = new Map();
         for (const name in pass.uniforms) {
@@ -170,6 +208,14 @@ function depointerize(passes) {
             const vname = variables.add(pass.uniforms[name],name);
             uniforms.set(name,vname);
             uniformTypes.set(name,pass.shader.type(name));
+        }
+        // SAMPLERS
+        const samplers = new Map();
+        for (const sampler in pass.samplers) {
+            const texture = pass.samplers[sampler];
+            const textureName = textures.add(texture,sampler);
+            const unit = pass.shader.samplers.get(sampler);
+            samplers.set(unit,textureName);
         }
         // Make sure to catch canvas framebuffers, to name them "CANVAS"
         // This also ensures that separately constructed CanvasRenderbuffer
@@ -184,6 +230,7 @@ function depointerize(passes) {
             callback: callbackName,
             framebuffer: framebufferName,
             shader: shaderName,
+            samplers: samplers,
             uniforms: uniforms,
             uniformTypes: uniformTypes,
         });
@@ -194,8 +241,8 @@ function depointerize(passes) {
         variables:variables.asObject(),
         callbacks:callbacks.asObject(),
         framebuffers:framebuffers.asObject(),
+        textures: textures.asObject(),
     };
-    console.log(framebuffers,env.framebuffers);
     return [depointerized,env];
 }
 
@@ -290,6 +337,8 @@ class PassRecorder {
                 }
             }
         }
+        // We already checked the samplers during depointerization
+        
         // Check to see if the callback is defined.
         const callback = env.callbacks[pass.callback];
         if (typeof callback === "undefined" || 
@@ -344,6 +393,18 @@ class PassRecorder {
                         `shader.uniforms[${jsString(uniform)}],` +
                         `env.variables[${jsString(variable)}].a);`
                     );
+                }
+            }
+            // Swap textures
+            for (const [unit,texture] of pass.samplers) {
+                if (texture === null) continue; // Marked as "don't care"
+                if (this.textures.get(unit) !== texture) {
+                    this.textures.set(unit,texture);
+                    l.push(`gl.activeTexture(gl.TEXTURE0 + ${unit});`);
+                    l.push(`gl.bindTexture(gl.TEXTURE_2D,` +
+                        `env.textures[${jsString(texture)}].texture);`
+                    );
+                        
                 }
             }
         }

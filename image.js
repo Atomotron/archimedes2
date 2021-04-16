@@ -32,8 +32,11 @@ read from by binding as a texture.
 */
 
 class Texture {
-    constructor() {
-    
+    constructor(gl,source,settings={}) {
+        // Interface info
+        this.hasTexture = true;
+        this.hasFramebuffer = false;
+        //
     }
 }
 
@@ -42,6 +45,7 @@ class Texture {
 export class CanvasRenderbuffer {
     constructor(gl) {
         this.hasFramebuffer = true;
+        this.hasTexture = false;
         this.framebuffer = null; // This signifies the canvas RB
         // Get info about the default framebuffer
         // note: It's not possible to do this with the normal
@@ -76,11 +80,13 @@ export class Framebuffer {
         this.width = width;
         this.height = height;
         this.hasDepthstencil = hasDepthstencil;
+        this.hasTexture = true;
         // Create color attachment (image texture)
+        //gl.activeTexture(gl.TEXTURE0); //It doesn't matter which texture unit
         this.texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         gl.texImage2D(
-            this.texture,
+            gl.TEXTURE_2D,
             0, // framebuffers work on mip level 0
             gl.RGBA, //Only RGBA framebuffer support is guaranteed
             width,height,
