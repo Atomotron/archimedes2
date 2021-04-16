@@ -1,7 +1,7 @@
 'use strict'
 
 import {GL_TYPES_test} from '../webgltypes.js';
-import {CanvasRenderbuffer,Framebuffer} from '../image.js';
+import {CanvasRenderbuffer,Framebuffer,Texture} from '../image.js';
 import {Shader, compileShaders} from '../shader.js';
 import {compileRenderer} from '../pass.js';
 import {Vec1,Vec2,Vec3,Vec4,
@@ -103,6 +103,12 @@ if (gl !== null) {
     const time = Vec1.From(0.0);
     // Framebuffer
     const fb = new Framebuffer(gl,128,128);
+    // Texture
+    const tex = new Texture(
+        gl,
+        document.getElementById('tex'),
+        {stretch:true}
+    );
     
     // Render environment
     const sequence = [
@@ -118,7 +124,7 @@ if (gl !== null) {
             draw: (gl) => {
                 gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
             },
-            samplers: {background: fb},
+            samplers: {background: tex},
         },
     ];
     window.gl = gl;
