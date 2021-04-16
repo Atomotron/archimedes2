@@ -35,14 +35,6 @@ import {Shader} from './shader.js';
 }```
 */
 
-export class Pass {
-    constructor(name,shader,uniforms) {
-        this.name = name;
-        this.shader = shader;
-        this.uniforms = new Map(Object.entries(uniforms));
-    }
-}
-
 // From joliss' NPM module "js-string-escape" with slight modifications
 // https://github.com/joliss/js-string-escape/blob/master/index.js
 function jsString(string) {
@@ -68,31 +60,6 @@ function jsString(string) {
     });
     return `"${escaped}"`;
 };
-
-class Deduplicator {
-    constructor() {
-        this.names = new Map();// names
-        this.refs = new Map(); // ref -> name
-    }
-    // Attempts to add the reference to the internal map.
-    // If the default name is already taken, choose a new one
-    // by incrementing an appended number.
-    // RETURNS THE NAME BY WHICH IT WAS ACTUALLY ADDED
-    add(ref,defaultName='') {
-        let name = defaultName || '0';
-        for (let i=1; this.names.has(name); ++i) {
-            // This will eventually count up to a name that's not used.
-            name = `${defaultName}${i}`;
-        }
-        // at this point, `name` is unused
-        this.names.set(name,ref);
-        this.refs.set(ref,name);
-        return name; // return the name we ended up using
-    }
-    asObject() {
-        return Object.fromEntries(this.names);
-    }
-}
 
 // Returns true iff the given pass sequence can be depointerized.
 function typecheckDepointerize(passes) {
@@ -180,6 +147,32 @@ function typecheckDepointerize(passes) {
         }
     }
     return good;
+}
+
+// Utility class for depointerization
+class Deduplicator {
+    constructor() {
+        this.names = new Map();// names
+        this.refs = new Map(); // ref -> name
+    }
+    // Attempts to add the reference to the internal map.
+    // If the default name is already taken, choose a new one
+    // by incrementing an appended number.
+    // RETURNS THE NAME BY WHICH IT WAS ACTUALLY ADDED
+    add(ref,defaultName='') {
+        let name = defaultName || '0';
+        for (let i=1; this.names.has(name); ++i) {
+            // This will eventually count up to a name that's not used.
+            name = `${defaultName}${i}`;
+        }
+        // at this point, `name` is unused
+        this.names.set(name,ref);
+        this.refs.set(ref,name);
+        return name; // return the name we ended up using
+    }
+    asObject() {
+        return Object.fromEntries(this.names);
+    }
 }
 
 // Extracts pointers from the passes in a sequence 
