@@ -7,12 +7,24 @@ I recommend using these flags to check how each object can be used, because
 not every object supporting a specific interface will be related to the others
 through something that JS knows about, like inheritance.
 
+## Destruction
+Like all objects corresponding to GPU resources, everything in this module
+has a `destroy` method. You are advised to call it only when the GPU is done
+using it to render with. Because the GPU is asyncronous, you should wait one
+full frame cycle after the resouce is no longer used before deleting it. 
+Otherwise, the destruction call may block the whole thread. If you think 
+your GPU might be rendering more than one frame at a time, wait more than one.
+
 ## Readable Pixels
 Anything that can have pixels read from it, but not written to it,
 will have the following three attributes set:
 
 - hasTexture = true
 - texture = a WebGLTexture
+- width = width in pixels
+- height = height in pixels
+- maxU = the highest useful u coordinate (used when the image data only covers part of the texture, 1.0 if the whole texture is real data.)
+- maxV = the highest useful v coordinate (used when the image data only covers part of the texture, 1.0 if the whole texture is real data.)
 - hasFramebuffer = true | false (see below)
 
 ## Writeable Pixels
@@ -31,12 +43,157 @@ read from by binding as a texture.
 
 */
 
-class Texture {
+// Note: 2^x = 0 for no x, but we still consider 0 a power of two.
+
+// Finds the nearest power of two >= x
+// Works when x <= 1073741824 (2^30)
+function nearestPowerOfTwoGreaterThanOrEqual(x) {
+    if (x < 2) return x; // 1 and 0 won't work the method below
+    return nearestPowerOfTwoLessThanOrEqual(x-1) << 1;
+}
+
+// Finds the nearest power of two <= x
+// Works when x <= 1073741824 (2^30)
+function nearestPowerOfTwoLessThanOrEqual(x) {
+    const leading_unsigned_zeros = Math.clz32(x)-1;
+    return 0x4000_0000 >>> leading_unsigned_zeros;
+}
+
+// Works up to 2^31-1 (max 32 bit signed int)
+// Works when x <= 1073741824 (2^30)
+function isPowerOfTwo(x) {
+    return x === nearestPowerOfTwoLessThanOrEqual(x);    
+}
+
+// Resize an image.
+export function resizeImage(width,height,image,stretch=true) {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const ctx = tempCanvas.getContext('2d',{alpha:true,desynchronized:true});
+    if (!stretch)
+        ctx.clearRect(0,0,width,height); // transparent black
+    if (stretch)
+        ctx.drawImage(image,0,0,width,height);
+    else
+        ctx.drawImage(image,0,0); // This will not scale it
+    return tempCanvas;
+}
+
+// Determines the source dimensions of anything that can be used to
+// create a texture. Returns [width,height].
+export function trueDimensions(source) {
+    const w = source.naturalWidth || // HTMLImageElement
+              source.videoWidth   || // HTMLVideoElement
+              source.width;          // ImageData,HTMLCanvasElement,ImageBitmap
+    const h = source.naturalHeight || // HTMLImageElement
+              source.videoHeight   || // HTMLVideoElement
+              source.height;          // ImageData,HTMLCanvasElement,ImageBitmap
+    return [w,h];
+}
+
+/*
+# Texture
+
+## Settings
+Settings `minFilter`,`magFilter`,`wrapS`, and `wrapT` correspond to
+the typical OpenGL texture parameters. The `stretch` setting determines
+the behavior that is invoked when something is wrong with the size of the
+input texture. If `stretch` is true, the image will be scaled. If it is
+false, it will be given transparent black padding if it is too small.
+
+If the source image is larger than `gl.getParameter(gl.MAX_TEXTURE_SIZE)`,
+it will always be scaled down, not clipped.
+
+The need to resize the image is automatically determined from the filter and
+wrapping settings. If the filter and wrapping settings could work with a
+non-power-of-two texture, then the texture will not be resized unless it is
+larger than the MAX_TEXTURE_SIZE gl parameter.
+
+## Sources
+
+Textures may be created with any of:
+- ImageData,
+- HTMLImageElement,
+- HTMLCanvasElement,
+- HTMLVideoElement,
+- ImageBitmap.
+
+Creation from buffers is not presently supported.
+*/
+export class Texture {
     constructor(gl,source,settings={}) {
         // Interface info
         this.hasTexture = true;
         this.hasFramebuffer = false;
-        //
+        // Read settings
+        this.minFilter = settings.minFilter  || gl.LINEAR_MIPMAP_LINEAR;
+        this.magFilter = settings.magFilter  || gl.LINEAR;
+        this.wrapS =     settings.wrapS      || gl.CLAMP_TO_EDGE;
+        this.wrapT =     settings.wrapT      || gl.CLAMP_TO_EDGE;
+        this.stretch =   typeof settings.stretch === 'undefined' ?
+                            true : settings.stretch;  
+        // Figure out what we have, and what we need
+        const mipmapsNeeded = !(this.minFilter === gl.NEAREST || 
+                                this.minFilter === gl.LINEAR)
+        const canBeNPoT = 
+            !mipmapsNeeded &&
+            this.wrapS === gl.CLAMP_TO_EDGE &&
+            this.wrapT === gl.CLAMP_TO_EDGE;
+        const [sourceWidth,sourceHeight] = trueDimensions(source);  
+        let safeSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        // safeSize is not always a power of two, so we have to clip it.
+        safeSize = canBeNPoT ? safeSize : 
+                               nearestPowerOfTwoLessThanOrEqual(safeSize);
+        // Compute target width and height
+        let targetWidth=sourceWidth,targetHeight=sourceHeight;
+        // Grow to nearest power of two, if necessary
+        if (!canBeNPoT) {
+            targetWidth = nearestPowerOfTwoGreaterThanOrEqual(targetWidth);
+            targetHeight = nearestPowerOfTwoGreaterThanOrEqual(targetHeight);
+        }
+        // Clip to safe size limits. This preserves the PoT property because
+        // earlier we truncated safeSize to make sure it was PoT.
+        if (targetWidth > safeSize) targetWidth = safeSize;
+        if (targetHeight > safeSize) targetHeight = safeSize;
+        // Safety shrinking overrides stretch setting, because we never clip.
+        this.stretch = this.stretch || 
+                      (targetWidth < sourceWidth) ||
+                      (targetHeight < sourceHeight);
+        // Resize the source image if necessary
+        if (targetWidth !== sourceWidth || targetHeight !== sourceHeight) {
+            source = resizeImage(targetWidth,targetHeight,source,this.stretch);
+        }
+        //console.log(this.stretch,sourceWidth,sourceHeight,'->',targetWidth,targetHeight);
+        // Now, create the texture.
+        this.texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0, // start at mip 0
+            gl.RGBA, // Always use RGBA
+            gl.RGBA, //must be the same as internalformat above
+            gl.UNSIGNED_BYTE, // the only guaranteed supported type
+            source, // upload the scaled source
+        );
+        // Set parameters
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, this.wrapS);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, this.wrapT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, this.magFilter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, this.minFilter);
+        // Generate mipmaps if required for filtering
+        if (mipmapsNeeded)
+            gl.generateMipmap(gl.TEXTURE_2D)
+        // Save useful parameters for reading from this texture later on
+        this.width = targetWidth;
+        this.height = targetHeight;
+        // Compute the u and v coordinates that the data-filled region
+        // extends over. If stretched, it's the whole thing.
+        this.maxU = this.stretch ? 1.0 : sourceWidth / targetWidth;
+        this.maxV = this.stretch ? 1.0 : sourceHeight / targetHeight;
+    }
+    destroy(gl) {
+        gl.deleteTexture(this.texture);    
     }
 }
 
@@ -79,6 +236,8 @@ export class Framebuffer {
     constructor(gl,width,height,hasDepthstencil=false) {
         this.width = width;
         this.height = height;
+        this.maxU = 1.0; // u coordinate ranges up to 1
+        this.maxV = 1.0; // v coordinate ranges up to 1
         this.hasDepthstencil = hasDepthstencil;
         this.hasTexture = true;
         // Create color attachment (image texture)
@@ -136,6 +295,21 @@ export class Framebuffer {
         const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         if (status !== gl.FRAMEBUFFER_COMPLETE) {
             console.error(`Framebuffer creation failed with code ${status}.`);
+        }
+        // Attach and clear framebuffer to put it in a known state.
+        // Framebuffer is still bound from above.
+        gl.clearColor(0.0,0.0,0.0,0.0); // Transparent black
+        if (this.hasDepthstencil) {
+            /* The  state  required  for  clearing  is  a  clear  value  for  each  of  the  color  buffer,the depth buffer, and the stencil buffer */
+            // The above implies that glEnable is NOT needed to clear buffers.
+            gl.clearDepth(1.0); // Greatest depth
+            gl.clearStencil(0); 
+            gl.clear(gl.COLOR_BUFFER_BIT | 
+                     gl.DEPTH_BUFFER_BIT | 
+                     gl.STENCIL_BUFFER_BIT
+            );
+        } else {
+            gl.clear(gl.COLOR_BUFFER_BIT);
         }
     }
     destroy(gl) {
