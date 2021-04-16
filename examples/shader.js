@@ -1,6 +1,7 @@
 'use strict'
 
 import {GL_TYPES_test} from '../webgltypes.js';
+import {CanvasRenderbuffer} from '../image.js';
 import {Shader, compileShaders} from '../shader.js';
 import {compileRenderer} from '../pass.js';
 import {Vec1,Vec2,Vec3,Vec4,
@@ -104,6 +105,7 @@ if (gl !== null) {
     // Render environment
     const sequence = [
         {   name:"Swirl",
+            framebuffer: new CanvasRenderbuffer(gl),
             shader:shader,
             uniforms: {
                 'time': time,
@@ -116,6 +118,7 @@ if (gl !== null) {
             },
         },
     ];
+    window.gl = gl;
     const [render,env] = compileRenderer(sequence);
     
     (function tick(t_ms) {

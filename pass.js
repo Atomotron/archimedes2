@@ -13,6 +13,7 @@ import {Shader} from './shader.js';
         program: WebGLProgram,
         uniforms: {uniform1: WebGLUniformLocation, ...},
       }, ...},
+      framebuffers: {framebuffer name: (see Image.js)}
       // IndirectArrays for uploading to uniforms
       variables: {uniform1: {a: typed array}, ...},
       // Functions to call when a pass is ready
@@ -23,6 +24,7 @@ import {Shader} from './shader.js';
 ```javascript
 {
       name: pass name
+      framebuffer: framebuffer name
       callback: callback name
       // Shader and uniform handles
       shader: shader name,
@@ -114,6 +116,7 @@ function typecheckDepointerize(passes) {
     const SHAPE = {
         name: "string",
         shader: "?object",
+        framebuffer: "?object",
         uniforms: "?object",
         draw: "function",
     }
@@ -127,10 +130,16 @@ function typecheckDepointerize(passes) {
                 const value = pass.uniforms[name];
                 if (typeof value === "undefined") {
                     good = false;
-                    console.error('pass',pass.name,'missing required uniform',
+                    console.error('Pass',pass.name,'missing required uniform',
                                   name);
                     continue;
                 }
+            }
+            // Make sure that the framebuffer is actually a framebuffer
+            if (!pass.framebuffer.hasFramebuffer) {
+                good = false;
+                console.error('Pass',pass.name,'framebuffer set to',
+                'something that isn\'t a framebuffer:',pass.framebuffer);
             }
         }
     }
@@ -143,7 +152,10 @@ function typecheckDepointerize(passes) {
 function depointerize(passes) {
     const shaders   = new Deduplicator(),
           variables = new Deduplicator(),
+          framebuffers = new Deduplicator(),
           callbacks = new Deduplicator();
+    // Special value that flags default canvas
+    framebuffers.add(null,"CANVAS");
     const variableTypes = new Map();
     const depointerized = []; // Passes with pointers removed.
     for (const pass of passes) {
@@ -159,10 +171,18 @@ function depointerize(passes) {
             uniforms.set(name,vname);
             uniformTypes.set(name,pass.shader.type(name));
         }
+        // Make sure to catch canvas framebuffers, to name them "CANVAS"
+        // This also ensures that separately constructed CanvasRenderbuffer
+        // objects will get recognized as equal.
+        let framebufferName = 'CANVAS';
+        if (pass.framebuffer.framebuffer !== null) {
+            framebufferName = framebuffers.add(pass.framebuffer,pass.name);
+        }
         // Construct new pass
         depointerized.push({
             name: pass.name,
             callback: callbackName,
+            framebuffer: framebufferName,
             shader: shaderName,
             uniforms: uniforms,
             uniformTypes: uniformTypes,
@@ -173,7 +193,9 @@ function depointerize(passes) {
         shaders:shaders.asObject(),
         variables:variables.asObject(),
         callbacks:callbacks.asObject(),
+        framebuffers:framebuffers.asObject(),
     };
+    console.log(framebuffers,env.framebuffers);
     return [depointerized,env];
 }
 
@@ -187,11 +209,9 @@ class PassRecorder {
         this.lines = [// Lines of code built up to execute function.
         // Variable to store current shader object
         "let shader = null;",
-        // Since framebuffers are not yet implemented, we should bind
-        // the canvas framebuffer (signified by null).
-        "gl.bindFramebuffer(gl.FRAMEBUFFER,null);",
         ]; 
         // State information
+        this.framebuffer = null; // name of bound framebuffer
         this.shader = null; // name of shader in use
         this.uniforms = new Map(); // shader name -> 
                                    //    Map<uniform name -> variable name>
@@ -277,6 +297,16 @@ class PassRecorder {
             good = false;
             log(`callback is \`${callback}\`, which is not a function.`);
         }
+        // Check to see if the framebuffer is defined,
+        // and if it is actually a framebuffer.
+        const fb = env.framebuffers[pass.framebuffer];
+        if (typeof fb === "undefined" || 
+            (pass.framebuffer !== 'CANVAS' && !fb.hasFramebuffer) ||
+            (pass.framebuffer === 'CANVAS' && fb !== null)
+            ) {
+            good = false;
+            log(`framebuffer is \`${fb}\`, which is not a framebuffer.`);
+        }
         return [good,messages];
     }
     // Records a fully explicit pass. Assume typecheck returned true.
@@ -287,6 +317,14 @@ class PassRecorder {
         // don't need to be set. Hence, shader and uniform setting
         // is gated behind this null check.
         if (pass.shader !== null) { 
+            // Swap framebuffers if needed
+            if (pass.framebuffer !== this.framebuffer) {
+                if (pass.framebuffer === "CANVAS") {
+                    l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,null); // Default (canvas) framebuffer`);
+                } else {
+                    l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,env.framebuffers[${jsString(pass.framebuffer)}].framebuffer);`);
+                }   
+            }
             // Swap shaders if needed
             if (pass.shader !== this.shader) {
                 this.shader = pass.shader;
@@ -314,7 +352,7 @@ class PassRecorder {
     }
     // Converts recorded stages to javascript code
     codegen() {
-        //console.log(this.lines.join('\n'));
+        console.log(this.lines.join('\n'));
         return new Function('gl','env',this.lines.join('\n'));
     }
 }
