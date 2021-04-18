@@ -1,11 +1,11 @@
 import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
 import {GL_TYPES} from './webgltypes.js';
+import {tabulate} from './util.js';
 /*
 Depends on:
 - `vector.js`
 - `webgltypes.js`
 */
-
 
 // djb2 (dan bernstein)
 // http://www.cse.yorku.ca/~oz/hash.html
@@ -41,58 +41,32 @@ function assignImageUnits(samplers,max_units) {
     return assignments;
 }
 
-// A name -> type code mapping that can work for uniforms or attributes.
-class Schema {
-    // Constructs a schema from an map of name -> OpenGL type code
-    constructor(types) {
-        this.schema = types; // name -> type code
-    }
-    toString(kind='') {
-        const lines = [`GLType\tType Name\t${kind}Name`];
-        for (const [name,typecode] of this.schema) {
-            const typename = GL_TYPES[typecode].name;
-            lines.push(`${typecode}\t${typename}\t${name}`);
-        }
-        return lines.join('\n');
-    }
-}
-
 // Stores the attribute type information necessary to determine whether a vertex
 // array object is compatible with a shader.
-class AttributeSchema extends Schema {
-    // TODO: Typechecking against vertex array objects
+export class AttributeSchema {
+    // Types: name -> opengl type code
+    // Locations: name -> attribute location
+    constructor(types,locations) {
+        this.names = new Set(types.keys());
+        this.types = types;
+        this.locations = locations;
+    }
+    // Returns a sub-schema where only the given names are included.
+    subschema(names) {
+        const t = new Map(this.types.entries()
+            .filter( ([k,v]) => names.has(k) )
+        );
+        const l = new Map(this.locations.entries()
+            .filter( ([k,v]) => names.has(k) )
+        );
+        return new AttributeSchema(names,t,l);
+    }
     toString() {
-        if (this.schema.size === 0) {
-            return '(no attributes)';
-        } else {
-            return super.toString('Attribute ');
+        const rows = [["NAME","ATTRIBUTE TYPE","LOCATION"]];
+        for (const [name,type] of this.types) {
+            rows.push([name,GL_TYPES[type].name,this.locations.get(name)]);
         }
-    }
-}
-
-// Stores the uniform type information necessary to determine whether
-// a set of TypedArray data sources is compatible with a shader
-class UniformSchema extends Schema {
-    // TODO: Typechecking against uniform structures
-    toString() {
-        if (this.schema.size === 0) {
-            return '(no uniforms)';
-        } else {
-            return super.toString('Uniform ');
-        }
-    }
-    // Returns type of the given uniform
-    type(name) {
-        return this.schema.get(name);
-    }
-    // Returns true iff the given uniform is present
-    has(name) {
-        return this.schema.has(name);
-    }
-    // Returns the name of the context function appropriate for uploading
-    // the uniform with the given name.
-    uniformv(name) {
-        return GL_TYPES[this.schema.get(name)].uniformv;
+        return tabulate("Attributes",rows);
     }
 }
 
@@ -128,17 +102,17 @@ export class Shader {
         /***** Attributes *****/
         const nattribs = gl.getProgramParameter(this.program,gl.ACTIVE_ATTRIBUTES);
         const attrTypes = new Map();
-        this.attributes = {}; // name -> attrib location (GLint)
+        const attrLocs = new Map(); // name -> attrib location (GLint)
         for (let i=0; i<nattribs; ++i) {
             const info = gl.getActiveAttrib(this.program,i);
             attrTypes.set(info.name,info.type);
-            this.attributes[info.name] = gl.getAttribLocation(this.program,info.name);
+            attrLocs.set(info.name,gl.getAttribLocation(this.program,info.name));
         }
-        this.attributeSchema = new AttributeSchema(attrTypes);
+        this.attributeSchema = new AttributeSchema(attrTypes,attrLocs);
         
         /***** Uniforms *****/
         const nuniforms = gl.getProgramParameter(this.program,gl.ACTIVE_UNIFORMS);
-        const uniformTypes = new Map();
+        this.uniformTypes = new Map();
         this.uniforms = {}; // name -> webgl uniform handle (WebGLUniformLocation)
         const samplerUniforms = new Map(); // name -> sampler uniform handle
         for (let i=0; i<nuniforms; ++i) {
@@ -153,7 +127,7 @@ export class Shader {
                     const element_type = info.type;
                     const element_handle =              
                         gl.getUniformLocation(this.program,element_name);
-                    uniformTypes.set(element_name,element_type);
+                    this.uniformTypes.set(element_name,element_type);
                     if (isSampler)
                         samplerUniforms.set(element_name,element_handle);
                     else
@@ -165,7 +139,7 @@ export class Shader {
                     info.size===1,
                     "I think uniform names not ending in `[0]` must have a size of 1."
                 );
-                uniformTypes.set(info.name,info.type);
+                this.uniformTypes.set(info.name,info.type);
                 const uniform_handle =              
                     gl.getUniformLocation(this.program,info.name);
                 if (isSampler)
@@ -174,7 +148,6 @@ export class Shader {
                     this.uniforms[info.name] = uniform_handle;
             }
         }
-        this.uniformSchema = new UniformSchema(uniformTypes);
         /***** Samplers *****/
         const nImageUnits = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
         // name -> fixed image unit number
@@ -197,22 +170,30 @@ export class Shader {
     }
     // Returns true iff the given uniform should be uploaded to this shader
     hasUniform(name) {
-        return this.uniformSchema.has(name);
+        return this.uniformTypes.has(name);
     }
     // Returns the GL type code of the given uniform
     type(name) {
-        return this.uniformSchema.type(name);
+        return this.uniformTypes.get(name);
     }
     // Debugging pretty-print
     toString() { 
-        const lines = [`SHADER ${this.name}`];
+        const lines = [`Shader \`${this.name}\``];
         lines.push(this.attributeSchema.toString());
-        lines.push(this.uniformSchema.toString());
-        lines.push("Sampler Image Unit Asignments");
-        for (const [name,unit] of this.samplers) {
-            lines.push(`unit ${unit} assigned to\t${name}`);
+        // Uniform table
+        const utable = [['NAME','UNIFORM TYPE']];
+        for (name in this.uniforms) {
+            const type = this.uniformTypes.get(name);
+            utable.push([name,GL_TYPES[type].name]);
         }
-        return lines.join('\n');
+        lines.push(tabulate("Uniforms",utable));
+        // Sampler table
+        const stable = [["NAME","IMAGE UNIT"]];
+        for (const [name,unit] of this.samplers) {
+            stable.push([name,unit]);
+        }
+        lines.push(tabulate("Samplers",stable));
+        return lines.join('\n\n');
     } 
 }
 // Returns an object full of `Shader`s, built from compiling the given sources.

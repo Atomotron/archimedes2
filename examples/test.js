@@ -3,6 +3,7 @@
 import {GL_TYPES_test} from '../webgltypes.js';
 import {CanvasRenderbuffer,Framebuffer,Texture} from '../image.js';
 import {Shader, compileShaders} from '../shader.js';
+import {VertexBufferSchema} from '../vertices.js';
 import {compileRenderer} from '../pass.js';
 import {Vec1,Vec2,Vec3,Vec4,
         Vec1I,Vec2I,Vec3I,Vec4I,
@@ -96,8 +97,9 @@ if (gl !== null) {
     gl.bufferData(gl.ARRAY_BUFFER, square_verts, gl.STATIC_DRAW);
     
     // Enable shader
-    gl.enableVertexAttribArray(shader.attributes.vertex);
-    gl.vertexAttribPointer(shader.attributes.vertex, 2, gl.FLOAT, false, 0, 0);
+    const loc = shader.attributeSchema.locations.get('vertex');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     
     // Create vec
     const time = Vec1.From(0.0);
@@ -130,11 +132,11 @@ if (gl !== null) {
     window.gl = gl;
     const [render,env] = compileRenderer(sequence);
     
+    // VBS test
+    const vbs = new VertexBufferSchema(shader.attributeSchema);
+    console.log(vbs.toString());
+    
     (function tick(t_ms) {
-        if (t_ms !== null) {
-            time.eqFrom(t_ms * 0.001);
-            render(gl,env);            
-        }
         //https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
         // Lookup the size the browser is displaying the canvas in CSS pixels.
         const displayWidth  = canvas.clientWidth;
@@ -146,8 +148,12 @@ if (gl !== null) {
 
         if (needResize) {
         // Make the canvas the same size
-        canvas.width  = displayWidth;
-        canvas.height = displayHeight;
+            canvas.width  = displayWidth;
+            canvas.height = displayHeight;
+        }
+        if (t_ms !== null) {
+            time.eqFrom(t_ms * 0.001);
+            render(gl,env);            
         }
         window.requestAnimationFrame(tick);
     })(null);

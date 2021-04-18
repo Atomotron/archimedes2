@@ -3,6 +3,8 @@
 Javascript code generation to produce fast type data lookups.
 """
 
+from collections import defaultdict
+
 OUTPUT_FILENAME = "webgltypes.js"
 
 HEADER = ''''use strict'
@@ -11,7 +13,9 @@ HEADER = ''''use strict'
 // Each entry has, as fields:
 // - name       (the name of the type as used by WebGL, 
 //                  such that ''+gl[GL_TYPES[code].name] === code)
+// - elementType    (the type of the constituent elements)
 // - nelements  (the number of primitive elements per unit of this type.
+// - nattributes (the number of vertex attribute locations taken up by this type. 1 except for matrix types)
 //                  for example, FLOAT_MAT4 has 16 elements and FLOAT_VEC3 has 3.)
 // - nbytes     (the number of bytes require to store something of this type.
 //                  for example, FLOAT_MAT4 takes 64 bytes.)
@@ -103,9 +107,11 @@ types = {
     'SAMPLER_2D'    : ['i',1,4,'Int32Array',True],
     'SAMPLER_CUBE'  : ['i',1,4,'Int32Array',True],
 }
+for k in types:
+    types[k].insert(0,k) # insert base type
 def pow(signature,n): # Type theoretic exponentiation
-    kind,nelements,nbytes,constructor,is_sampler = signature
-    return [kind,nelements*n,nbytes*n,constructor,is_sampler]
+    base,kind,nelements,nbytes,constructor,is_sampler = signature
+    return [base,kind,nelements*n,nbytes*n,constructor,is_sampler]
 # Derived types
 types.update({
     'FLOAT_VEC2'  :pow(types['FLOAT'],    2,),
@@ -125,24 +131,34 @@ types.update({
     'FLOAT_MAT4'    :pow(types['FLOAT_VEC4'],    4),
 })
 def uniform_setter_name(name,signature):
-    kind,nelements,nbytes,constructor,is_sampler = signature
+    base,kind,nelements,nbytes,constructor,is_sampler = signature
     if "MAT" in name:
         sqrt_nelements = ({16:4,9:3,4:2})[nelements] # highest mat is mat4
         assert(kind == 'f') # only float matrices
         return f"uniformMatrix{sqrt_nelements}fv"
     if nelements <= 4:
         return f"uniform{nelements}{kind}v"
+# Number of attributes taken up when used as a vertex attribute
+nattributes = defaultdict(lambda: 0)
+nattributes.update({
+    'FLOAT_MAT2'    :2,
+    'FLOAT_MAT3'    :3,
+    'FLOAT_MAT4'    :4,
+}) # = 1 if not in this dictionary
+
 
 # Make output dictionaries
 gl_types = {
     code: 
         {
             'name': '"'+names[code]+'"',
-            'nelements':  str(types[names[code]][1]),
-            'nbytes':     str(types[names[code]][2]),
-            'TypedArray': str(types[names[code]][3]),
+            'elementType':  '"'+types[names[code]][0]+'"',
+            'nelements':  str(types[names[code]][2]),
+            'nattributes':  str(nattributes[names[code]]),
+            'nbytes':     str(types[names[code]][3]),
+            'TypedArray': str(types[names[code]][4]),
             'uniformv':   '"'+uniform_setter_name(names[code],types[names[code]])+'"',
-            'is_sampler': 'true' if types[names[code]][4] else 'false',
+            'is_sampler': 'true' if types[names[code]][5] else 'false',
         }
     for code in names
 }
