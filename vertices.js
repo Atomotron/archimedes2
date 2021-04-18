@@ -107,7 +107,7 @@ export class VertexBufferSchema {
                 GL_TYPES[this.types[i]].name,this.attributeLocs[i],
             ]);
         }
-        return tabulate("VBuf. Schema",rows);
+        return tabulate("Vertex Buffer Schema",rows);
     }
 }
 
