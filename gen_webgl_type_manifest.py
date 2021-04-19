@@ -139,7 +139,7 @@ def uniform_setter_name(name,signature):
     if nelements <= 4:
         return f"uniform{nelements}{kind}v"
 # Number of attributes taken up when used as a vertex attribute
-nattributes = defaultdict(lambda: 0)
+nattributes = defaultdict(lambda: 1)
 nattributes.update({
     'FLOAT_MAT2'    :2,
     'FLOAT_MAT3'    :3,
