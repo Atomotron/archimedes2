@@ -26,14 +26,9 @@
 #extension GL_OES_standard_derivatives : enable
 precision highp float;
 attribute vec2 vertex;
-attribute vec3 vertex2;
-attribute vec2 vertex3;
-attribute mat2 matrix2;
-attribute float f;
-attribute mat3 matrix3;
 uniform float time;
 void main() {
-    gl_Position = vec4((matrix2*vertex)+ (matrix3*vertex2).xy+vertex3.xy,f+0.0,1.0); 
+    gl_Position = vec4(vertex,0.0,1.0); 
 }
 </script>
 
@@ -62,6 +57,7 @@ void main() {
 </script>
 <canvas id='canvas' width=512 height=512></canvas>
 <img id='tex' src="./tools-861x599-martin-vorel.jpg" alt="texture image" style="display:none;"></img>
+
 
 </body>
 </html>

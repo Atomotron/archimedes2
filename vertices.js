@@ -128,6 +128,7 @@ export class VertexBufferSchema {
             // Matrices fill multiple consecutive attribute locations.
             // This loop runs once for normal types, and N times for matN.
             for (let j=0; j<info.nattributes; j++) {
+                gl.enableVertexAttribArray(this.attributeLocs[i]);
                 gl.vertexAttribPointer(
                     this.attributeLocs[i],
                     size, // components per vertex attribute
@@ -149,7 +150,7 @@ export class VertexBufferSchema {
         for (let i=0; i<nStructs; i++) {
             // Check if we should rebase
             if (structs.length > i) {
-                structs.rebaseFrom(array,i);
+                structs[i].rebaseFrom(array,i);
             } else {
                 // New struct needed
                 structs.push(new this.Struct(array,i));
@@ -173,6 +174,7 @@ export class VertexBufferSchema {
 // A CPU-RAM backing buffer containing data to be uploaded to attribute buffers
 // Mixes array-like behavior (growTo, structs[]) with stack-like behavior
 //   (acquire,relenquish,count,clear)
+// NOTE: Only structs below `count` will be streamed to the GPU or drawn!
 // Interface:
 //  acquire()         : get a struct at the end of the array
 //  relenquish(struct): hand a struct back, and shrink the array
@@ -182,8 +184,8 @@ export class VertexBufferSchema {
 //  count             : number of active acquired elements
 //  structs[]         : attribute containing list of all allocated structs
 //  array             : f32 typed array containing packed data
-class VertexBufferBacking {
-    GROW_FACTOR = 2; // Size doubles with every growth
+export class VertexBufferBacking {
+    static GROW_FACTOR = 2; // Size doubles with every growth
     // Arguments:
     //  vbSchema: Vertex Buffer Schema
     //  count   : number of vertex structs to preallocate
@@ -191,22 +193,24 @@ class VertexBufferBacking {
         this.sch = vbSchema;
         this.count = count;
         this.structs = [];
-        this.array = new Float32Array(this.sch.sizeof(count));
+        this.array = new Float32Array(0);
         // The next size to grow to.
         this.nextSize = count*VertexBufferBacking.GROW_FACTOR || 1;
+        // Initialize array
+        this.growTo(count);
     }
     // Grows the buffer to contain at least `count` structs.
     // May do nothing, if we're already big enough.
     growTo(count) {
         if (this.structs.length < count) {
-            this.count = this.nextSize;
+            // Create a new array
+            this.array = new Float32Array(this.sch.sizeof(this.nextSize));
+            // Update structs and make more.
+            this.structs = this.sch.dice(this.array,this.structs);
+            // Increase next size
             this.nextSize = Math.ceil( // For noninteger growth factors
                 this.nextSize*VertexBufferBacking.GROW_FACTOR
             );
-            // Create a new array
-            this.array = new Float32Array(this.sch.sizeof(this.count));
-            // Update structs and make more.
-            this.structs = this.sch.dice(this.array,this.structs);
         }
     }
     acquire() {
@@ -238,25 +242,40 @@ class VertexBufferBacking {
 // Floating point buffer on the GPU
 // Always a "gl.ARRAY_BUFFER".
 export class VertexBuffer {
-    constructor(gl,size,usage) {
+    constructor(gl,usage,size=null) {
+        this.usage = usage;
+        this.size = size || 0;
         this.buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-        // Inform openGL in advance of size and usage
-        gl.bufferData(gl.ARRAY_BUFFER,size,usage);
+        // Inform openGL in advance of size and usage, if a size was set.
+        if (size !== null) {
+            gl.bufferData(gl.ARRAY_BUFFER,size,usage);
+        }
     }
     // Tell OpenGL to GC this buffer
     destroy(gl) {
         gl.deleteBuffer(this.buffer);
     }
-    // Upload data to the buffer.
-    // Since vertex attributes are always floating point in WebGL1, you
-    // should always use floating point arrays to upload data.
-    // Arguments:
-    //      data:           TypedArray (or T.A.View) full of data to write
-    //      dstByteOffset:  Offset in bytes at destination where writing starts
-    subData(gl,data,dstByteOffset=0) {
+    // Synchronizes with buffer backing
+    syncBacking(gl,backing) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-        gl.bufferSubData(gl.ARRAY_BUFFER, dstByteOffset, data);
+        if (backing.array.length !== this.size) {
+            // We need to allocate new GPU memory
+            this.size = backing.array.length;
+            gl.bufferData(
+                gl.ARRAY_BUFFER,
+                backing.array,
+                this.usage,
+            );
+        } else {
+            // We can reuse the same memory.
+            gl.bufferSubData(gl.ARRAY_BUFFER, 
+                0, // No dst offset
+                backing.array.subarray(
+                    0,backing.schema.sizeof(backing.count)
+                ),
+            );
+        }
     }
 }
 

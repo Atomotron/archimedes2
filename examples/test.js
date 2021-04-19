@@ -3,11 +3,12 @@
 import {GL_TYPES_test} from '../webgltypes.js';
 import {CanvasRenderbuffer,Framebuffer,Texture} from '../image.js';
 import {Shader, compileShaders} from '../shader.js';
-import {VertexBufferSchema} from '../vertices.js';
+import {VertexBufferSchema,VertexBufferBacking,VertexBuffer} from '../vertices.js';
 import {compileRenderer} from '../pass.js';
 import {Vec1,Vec2,Vec3,Vec4,
         Vec1I,Vec2I,Vec3I,Vec4I,
         Mat2,Mat3,Mat4} from '../vector.js';
+
 
 // Attempts to create a webgl context with some common extensions.
 // Returns {gl:null,messages:[...]} if creation failed (messages will explain why),
@@ -85,21 +86,6 @@ if (gl !== null) {
     );
     const shader = shaders.shader;
     console.log(shader.toString());
-    // Create simple square VBO to cover viewport
-    const square_verts = new Float32Array([
-        -1.0,-1.0,
-        1.0,-1.0,
-        -1.0,1.0,
-        1.0,1.0,
-    ]);    
-    const square_vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, square_vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, square_verts, gl.STATIC_DRAW);
-    
-    // Enable shader
-    const loc = shader.attributeSchema.locations.get('vertex');
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     
     // Create vec
     const time = Vec1.From(0.0);
@@ -135,8 +121,19 @@ if (gl !== null) {
     // VBS test
     const vbs = new VertexBufferSchema(shader.attributeSchema);
     console.log(vbs.toString());
-    const diced = vbs.dice(new Float32Array(vbs.sizeof(6)));
-    console.log(diced);
+    // VBB
+    const vbb = new VertexBufferBacking(vbs,0);
+    vbb.acquire().vertex.eqFrom(-1.0,-1.0);
+    vbb.acquire().vertex.eqFrom( 1.0,-1.0);
+    vbb.acquire().vertex.eqFrom(-1.0, 1.0,);
+    vbb.acquire().vertex.eqFrom( 1.0, 1.0,);
+    // VB
+    const vb = new VertexBuffer(gl,gl.STATIC_DRAW);
+    vb.syncBacking(gl,vbb);
+    // Note: vertexAttribPointer must be called with the buffer bound!
+    //       it implicitly attaches the current buffer with its args,
+    //       kind of surprisingly becasue it doesn't take target=gl.ARRAY_BUFFER.
+    vbs.vertexAttribPointer(gl);
     
     (function tick(t_ms) {
         //https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html

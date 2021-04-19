@@ -182,7 +182,7 @@ export class Shader {
         lines.push(this.attributeSchema.toString());
         // Uniform table
         const utable = [['NAME','UNIFORM TYPE']];
-        for (name in this.uniforms) {
+        for (const name in this.uniforms) {
             const type = this.uniformTypes.get(name);
             utable.push([name,GL_TYPES[type].name]);
         }
