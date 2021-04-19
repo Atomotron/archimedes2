@@ -135,6 +135,8 @@ if (gl !== null) {
     // VBS test
     const vbs = new VertexBufferSchema(shader.attributeSchema);
     console.log(vbs.toString());
+    const diced = vbs.dice(new Float32Array(vbs.sizeof(6)));
+    console.log(diced);
     
     (function tick(t_ms) {
         //https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html

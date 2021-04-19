@@ -2,6 +2,7 @@
 import {tabulate} from './util.js';
 import {GL_TYPES} from './webgltypes.js';
 import {AttributeSchema} from './shader.js';
+import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
 
 
 // Computes the largest number that divides both `a` and `b`
@@ -59,10 +60,61 @@ export class VertexBufferSchema {
             // Corresponds to about 16 vertex attribute locations. (16*4*4)
             throw "Too many attributes to interleave!";
         }
+        this.Struct = this.makeStructClass();
     }
-    // Returns the number of floats taken up by `n` of these structs.
+    // Create a struct object that can store one of the structs
+    // that this schema describes. 
+    makeStructClass() {
+        // closure variables
+        const structSize = this.structSize; 
+        const names = this.names;
+        const offsets = this.offsets;
+        const sizes = this.sizes;
+        const indirectArrayConstructors = this.types.map(
+            t => GL_TYPE_INDIRECT_ARRAYS[GL_TYPES[t].name]
+        );
+        // Create class
+        return class Struct {
+            // Takes an array, and its number within the array.
+            constructor(f32array,i) {
+                this.acquisitionIndex = 0; // Handle for VertexBufferBacking
+                const base = structSize*i;
+                // Iterate through each struct field and add it to `this`
+                for (let i=0; i < names.length; i++) {
+                    const offset = base+offsets[i];
+                    this[names[i]] = new indirectArrayConstructors[i](
+                        f32array.subarray(offset,offset+sizes[i])
+                    );
+                }
+            }
+            // Rebases contained indirect arrays to new f32 array
+            rebaseFrom(f32array,i) {
+                const base = structSize*i;
+                // Iterate through each struct field and add it to `this`
+                for (let i=0; i < names.length; i++) {
+                    const offset = base+offsets[i];
+                    const subarray = f32array.subarray(offset,offset+sizes[i]);
+                    const indirectArray = this[names[i]];
+                    // Copy backwards to save old value
+                    subarray.set(indirectArray.a);
+                    // Change indirectarray backing pointer
+                    indirectArray.a = subarray;
+                }
+            }
+            // Swaps contents with another struct
+            swap(other) {
+               for (let i=0; i < names.length; i++) {
+                    const name = names[i];
+                    const ours = this[name];
+                    this[name] = other[name];
+                    other[name] = ours;
+                }
+            }
+        }
+    }
+    // Returns the number of f32s it would take to contain `n` of these structs
     sizeof(n) {
-        return n * this.structSize;
+        return this.structSize*n;
     }
     // Sets up vertex pointers into a buffer matching this schema.
     vertexAttribPointer(gl) {
@@ -87,18 +139,25 @@ export class VertexBufferSchema {
             }
         }
     }
-    // Dices a Float32Array into sub-arrays corresponding to our struct fields.
-    // `array` is the typed array, `output` is the (optional) place where the
-    // sub-arrays will be appended. Always returns the output array.
-    dice(array,output=[]) {
-        for (let i=0; i<this.names.length; i++) {
-            const start = this.offsets[i];
-            output.push(
-                array.subarray(start,start+this.sizes[i])
-            );
+    // Dices a float23 array into indirect arrays. Existing arrays may be
+    // provided via `structs` for rebasing. If more output arrays
+    // are needed than are given as input, new structs will be appended
+    // to the given list.
+    // Returns the new list of structs.
+    dice(array,structs=[]) {
+        const nStructs = Math.floor(array.length / this.structSize);
+        for (let i=0; i<nStructs; i++) {
+            // Check if we should rebase
+            if (structs.length > i) {
+                structs.rebaseFrom(array,i);
+            } else {
+                // New struct needed
+                structs.push(new this.Struct(array,i));
+            }
         }
-        return output;
+        return structs;
     }
+    // Prints a table of the schema for debugging and development purposes.
     toString() {
         const rows = [['ID','NAME','SIZE','OFFSET','TYPE','ATTR. LOC.']];
         for (let i=0; i<this.names.length; i++) {
@@ -111,14 +170,69 @@ export class VertexBufferSchema {
     }
 }
 
+// A CPU-RAM backing buffer containing data to be uploaded to attribute buffers
+// Mixes array-like behavior (growTo, structs[]) with stack-like behavior
+//   (acquire,relenquish,count,clear)
+// Interface:
+//  acquire()         : get a struct at the end of the array
+//  relenquish(struct): hand a struct back, and shrink the array
+//  clear             : resets stack to nothing
+//  growTo(count)     : makes sure the backing array is at least this big
+//  swap(i,j)         : exchange two structs in the array
+//  count             : number of active acquired elements
+//  structs[]         : attribute containing list of all allocated structs
+//  array             : f32 typed array containing packed data
 class VertexBufferBacking {
-    constructor(vbSchema,n=0) {
+    GROW_FACTOR = 2; // Size doubles with every growth
+    // Arguments:
+    //  vbSchema: Vertex Buffer Schema
+    //  count   : number of vertex structs to preallocate
+    constructor(vbSchema,count=0) {
         this.sch = vbSchema;
-        this.length = n;
-        this.instances = [];
+        this.count = count;
+        this.structs = [];
+        this.array = new Float32Array(this.sch.sizeof(count));
+        // The next size to grow to.
+        this.nextSize = count*VertexBufferBacking.GROW_FACTOR || 1;
     }
-    acquire() {}
-    relenquish() {}
+    // Grows the buffer to contain at least `count` structs.
+    // May do nothing, if we're already big enough.
+    growTo(count) {
+        if (this.structs.length < count) {
+            this.count = this.nextSize;
+            this.nextSize = Math.ceil( // For noninteger growth factors
+                this.nextSize*VertexBufferBacking.GROW_FACTOR
+            );
+            // Create a new array
+            this.array = new Float32Array(this.sch.sizeof(this.count));
+            // Update structs and make more.
+            this.structs = this.sch.dice(this.array,this.structs);
+        }
+    }
+    acquire() {
+        const index = this.count; // New index
+        this.growTo(this.count + 1);
+        this.count += 1;
+        const struct = this.structs[index];
+        struct.acquisitionIndex = index;
+        return struct;
+    }
+    swap(i,j) {
+        this.structs[i].swap(this.structs[j]);
+    }
+    relenquish(struct) {
+        if (this.count == 0) return; // Should never happen
+        const index = struct.acquisitionIndex;
+        // Make sure the struct being relenquished is on top of the stack
+        if (index !== this.count-1) {
+            this.swap(index,this.count-1);
+        }
+        // Decrement the count to not include the struct
+        this.count -= 1;
+    }
+    clear() {
+        this.count = 0;
+    }
 }
 
 // Floating point buffer on the GPU
@@ -138,9 +252,9 @@ export class VertexBuffer {
     // Since vertex attributes are always floating point in WebGL1, you
     // should always use floating point arrays to upload data.
     // Arguments:
-    //      dstByteOffset:  Offset in bytes at destination where writing starts
     //      data:           TypedArray (or T.A.View) full of data to write
-    subData(gl,dstByteOffset,data) {
+    //      dstByteOffset:  Offset in bytes at destination where writing starts
+    subData(gl,data,dstByteOffset=0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, dstByteOffset, data);
     }

@@ -1125,7 +1125,7 @@ const GL_TYPE_INDIRECT_ARRAYS = {
     FLOAT_MAT4 : Mat4,
     FLOAT_VEC2 : Vec2,
     FLOAT_VEC3 : Vec3,
-    FLOAT_VEC4 : Vec4,
+    FLOAT_VEC4 : Mat2, // NOTE: This works because Mat2 extends Vec4!!!
     INT      : Vec1I,
     INT_VEC2 : Vec2I,
     INT_VEC3 : Vec3I,
@@ -1140,6 +1140,31 @@ const GL_TYPE_INDIRECT_ARRAYS = {
     UNSIGNED_BYTE : null,
     UNSIGNED_INT : null,
     UNSIGNED_SHORT : null,
+}
+
+// Rebases the existing indirect arrays, and creates new ones
+// if typedArrays is longer. This is useful for rebasing diced
+// arrays. (See VertexBufferSchema in vertices.js)
+// Arguments:
+//  typedArrays:    n typed arrays
+//  types      :    types of indirect arrays. will be read as repeating.
+//  indirectArrays: N <= n indirect arrays to be overwritten
+//
+// Updates indirectArrays in place, and also returns the updated array.
+function typedArraysToIndirectArrays(typedArrays,types,indirectArrays=[]) {
+    for (let i=0; i<typedArrays.length; i++) {
+        if (indirectArrays.length > i) {
+            // There is an existing indirect array at this index
+            typedArrays[i].set(indirectArrays[i].a); // preserve old value
+            indirectArrays[i].a = typedArrays[i]; // change backing array
+        } else {
+            // A new array must be created
+            const type = types[i % types.length];
+            const Constructor = GL_TYPE_INDIRECT_ARRAYS[GL_TYPES[type].name];
+            indirectArrays.push(new Constructor(typedArrays[i]));
+        }
+    }
+    return indirectArrays;
 }
 
 __testVectors();
