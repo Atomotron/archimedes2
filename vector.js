@@ -140,13 +140,14 @@ function extractArgs(fn) {
 // and the updating assignment method (i.e. like += or *=) fooEq.
 function generateVariantMethods(Class) {
     const IS_EQ_FUNCTION = /^eq.*/;
-    function attachMethod(target,name,method_string) {
+    function attachMethod(target,name,args,method_string) {
+        console.log(args,method_string);
         Reflect.defineProperty(target,name,
         {
             configurable: true,
             writable: true,
             enumerable: false,
-            value: eval(`(${method_string})`),
+            value: Function(...args,method_string),
         });
     }
     // Array replacement method, set `to` to null to delete.
@@ -183,39 +184,33 @@ function generateVariantMethods(Class) {
             // Example: a.addeq(b) --> a.eqadd(a,b)
             if (base_name !== '') {
                 const method_name = lowerFirst(base_name)+'Eq';
-                const outer_args = replace(args,'self',null).join(',');
-                const inner_args = replace(args,'self','this').join(',');
-                attachMethod(Class.prototype,method_name,
-`function ${method_name} (${outer_args}) {
-    return this.${name}(${inner_args});
-}`              );
+                const outer_args = replace(args,'self',null);
+                const inner_args = replace(args,'self','this');
+                attachMethod(Class.prototype,method_name,outer_args,
+                    `return this.${name}(${inner_args.join(',')});`);
             }
             // Generate x__ method that constructs a new `this` to use as output
             // and that uses `this` as the self-argument.
             // Example: a.add(b) --> (new vector).eqadd(a,b)
             if (base_name !== '') {
                 const method_name = lowerFirst(base_name);
-                const outer_args = replace(args,'self',null).join(',');
-                const inner_args = replace(args,'self','this').join(',');
-                attachMethod(Class.prototype,method_name,
-`function ${method_name} (${outer_args}) {
-    const constructed = this.constructor.Default();
-    return constructed.${name}(${inner_args});
-}`              );
+                const outer_args = replace(args,'self',null);
+                const inner_args = replace(args,'self','this');
+                attachMethod(Class.prototype,method_name,outer_args,
+`const constructed = this.constructor.Default();
+return constructed.${name}(${inner_args.join(',')});`);
             }
             // Generate static X__ method that constructs a new `this`
             // but otherwise behaves like the eq__ method.
             // Example: Vec2.Add(a,b) --> (new vector).eqadd(a,b)
             if (base_name !== '') {
                 const method_name = upperFirst(base_name);
-                const outer_args = args.join(',');
-                const inner_args = args.join(',');
+                const outer_args = args;
+                const inner_args = args;
                 // Attaching to Class makes it static
-                attachMethod(Class,method_name, 
-`function ${method_name} (${outer_args}) {
-    const constructed = this.Default();
-    return constructed.${name}(${inner_args});
-}`              );
+                attachMethod(Class,method_name,outer_args, 
+`const constructed = this.Default();
+return constructed.${name}(${inner_args.join(',')});`);
             }
         }
     }
@@ -435,8 +430,8 @@ class Vec2 extends AbstractVecN {
     set y(v){this.a[1] = v};
     // Rotation, specific to vec2
     eqRotate(self,theta) {
-        const [out,a] = [this.a,self.a];
-        const [c,s] = [Math.cos(theta),Math.sin(theta)];
+        const out=this.a, a=self.a;
+        const c=Math.cos(theta), s=Math.sin(theta);
         const out0 = c*a[0] + s*a[1];
         out[1]     = s*a[0] - c*a[1];
         out[0] = out0;
@@ -454,28 +449,28 @@ class Vec2 extends AbstractVecN {
     eqYhat() {this.zeroEq();this.a[1] = 1;return this;}
     // Scalar multiplication
     eqMul(self,scalar) {
-        const [out,a] = [this.a,self.a];
+        const out=this.a, a=self.a;
         out[0] = a[0] * scalar;
         out[1] = a[1] * scalar;
         return this;
     }
     // Vector addition
     eqAdd(self,other) {
-        const [out,a,b] = [this.a,self.a,other.a];
+        const out=this.a, a=self.a, b=other.a;
         out[0] = a[0] + b[0];
         out[1] = a[1] + b[1];
         return this;
     }
     // Vector subtraction
     eqSub(self,other) {
-        const [out,a,b] = [this.a,self.a,other.a];
+        const out=this.a, a=self.a, b=other.a;
         out[0] = a[0] - b[0];
         out[1] = a[1] - b[1];
         return this;
     }
     // Dot product
     dot(other) {
-        const [a,b] = [this.a,other.a];
+        const a=this.a, b=other.a;;
         return Math.fround(a[0] * b[0]) +
                Math.fround(a[1] * b[1]);
     }
@@ -513,7 +508,7 @@ class Vec3 extends AbstractVecN {
     eqZhat() {this.zeroEq();this.a[2] = 1;return this;}
     // Scalar multiplication
     eqMul(self,scalar) {
-        const [out,a] = [this.a,self.a];
+        const out=this.a, a=self.a;
         out[0] = a[0] * scalar;
         out[1] = a[1] * scalar;
         out[2] = a[2] * scalar;
@@ -521,7 +516,7 @@ class Vec3 extends AbstractVecN {
     }
     // Vector addition
     eqAdd(self,other) {
-        const [out,a,b] = [this.a,self.a,other.a];
+        const out=this.a, a=self.a, b=other.a;
         out[0] = a[0] + b[0];
         out[1] = a[1] + b[1];
         out[2] = a[2] + b[2];
@@ -529,7 +524,7 @@ class Vec3 extends AbstractVecN {
     }
     // Vector subtraction
     eqSub(self,other) {
-        const [out,a,b] = [this.a,self.a,other.a];
+        const out=this.a, a=self.a, b=other.a;
         out[0] = a[0] - b[0];
         out[1] = a[1] - b[1];
         out[2] = a[2] - b[2];
@@ -537,7 +532,7 @@ class Vec3 extends AbstractVecN {
     }
     // Dot product
     dot(other) {
-        const [a,b] = [this.a,other.a];
+        const a=this.a, b=other.a;;
         return Math.fround(a[0] * b[0]) +
                Math.fround(a[1] * b[1]) +
                Math.fround(a[2] * b[2]);
@@ -583,7 +578,7 @@ class Vec4 extends AbstractVecN {
     eqWhat() {this.zeroEq();this.a[3] = 1;return this;}
     // Scalar multiplication
     eqMul(self,scalar) {
-        const [out,a] = [this.a,self.a];
+        const out=this.a, a=self.a;
         out[0] = a[0] * scalar;
         out[1] = a[1] * scalar;
         out[2] = a[2] * scalar;
@@ -592,7 +587,7 @@ class Vec4 extends AbstractVecN {
     }
     // Vector addition
     eqAdd(self,other) {
-        const [out,a,b] = [this.a,self.a,other.a];
+        const out=this.a, a=self.a, b=other.a;
         out[0] = a[0] + b[0];
         out[1] = a[1] + b[1];
         out[2] = a[2] + b[2];
@@ -601,7 +596,7 @@ class Vec4 extends AbstractVecN {
     }
     // Vector subtraction
     eqSub(self,other) {
-        const [out,a,b] = [this.a,self.a,other.a];
+        const out=this.a, a=self.a, b=other.a;
         out[0] = a[0] - b[0];
         out[1] = a[1] - b[1];
         out[2] = a[2] - b[2];
@@ -610,7 +605,7 @@ class Vec4 extends AbstractVecN {
     }
     // Dot product
     dot(other) {
-        const [a,b] = [this.a,other.a];
+        const a=this.a, b=other.a;;
         return Math.fround(a[0] * b[0]) +
                Math.fround(a[1] * b[1]) +
                Math.fround(a[2] * b[2]) +
