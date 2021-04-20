@@ -141,7 +141,6 @@ function extractArgs(fn) {
 function generateVariantMethods(Class) {
     const IS_EQ_FUNCTION = /^eq.*/;
     function attachMethod(target,name,args,method_string) {
-        console.log(args,method_string);
         Reflect.defineProperty(target,name,
         {
             configurable: true,
