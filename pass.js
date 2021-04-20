@@ -95,11 +95,20 @@ function typecheckDepointerize(passes) {
         const good_shape = shapeCheck(pass,SHAPE);
         good &&= good_shape;
         if (!good_shape) continue;
-        // Make sure the shader is actually a shader
-        if (!pass.shader instanceof Shader) {
+        // Make sure that the framebuffer is actually a framebuffer
+        if (!pass.framebuffer.hasFramebuffer) {
             good = false;
-            console.error('Pass',pass.name,'does not have a Shader set as its',
+            console.error('Pass',pass.name,'framebuffer set to',
+            'something that isn\'t a framebuffer:',pass.framebuffer);
+        }
+        
+        // Make sure the shader is actually a shader
+        if (!(pass.shader instanceof Shader)) {
+            if (pass.shader !== null) {
+                good = false;
+                console.error('Pass',pass.name,'does not have a Shader set as its',
             'shader. Instead, it has:',pass.shader);
+            }
             continue;
         }
         
@@ -111,12 +120,6 @@ function typecheckDepointerize(passes) {
                               name);
                 continue;
             }
-        }
-        // Make sure that the framebuffer is actually a framebuffer
-        if (!pass.framebuffer.hasFramebuffer) {
-            good = false;
-            console.error('Pass',pass.name,'framebuffer set to',
-            'something that isn\'t a framebuffer:',pass.framebuffer);
         }
         // Make sure all the textures are actually textures, and that
         // none of them are the framebuffer.
@@ -160,6 +163,9 @@ class Deduplicator {
     // by incrementing an appended number.
     // RETURNS THE NAME BY WHICH IT WAS ACTUALLY ADDED
     add(ref,defaultName='') {
+        if (this.refs.has(ref)) {
+            return this.refs.get(ref);
+        }
         let name = defaultName || '0';
         for (let i=1; this.names.has(name); ++i) {
             // This will eventually count up to a name that's not used.
@@ -189,27 +195,6 @@ function depointerize(passes) {
     const variableTypes = new Map();
     const depointerized = []; // Passes with pointers removed.
     for (const pass of passes) {
-        const shaderName = shaders.add(pass.shader,pass.shader.name);
-        const callbackName = callbacks.add(pass.draw,pass.name);
-        // UNIFORMS
-        const uniforms = new Map();
-        const uniformTypes = new Map();
-        for (const name in pass.uniforms) {
-            // Just forget about unused uniforms.
-            if (!pass.shader.hasUniform(name)) continue;
-            // The shader has it, so let's use it.
-            const vname = variables.add(pass.uniforms[name],name);
-            uniforms.set(name,vname);
-            uniformTypes.set(name,pass.shader.type(name));
-        }
-        // SAMPLERS
-        const samplers = new Map();
-        for (const sampler in pass.samplers) {
-            const texture = pass.samplers[sampler];
-            const textureName = textures.add(texture,sampler);
-            const unit = pass.shader.samplers.get(sampler);
-            samplers.set(unit,textureName);
-        }
         // Make sure to catch canvas framebuffers, to name them "CANVAS"
         // This also ensures that separately constructed CanvasRenderbuffer
         // objects will get recognized as equal.
@@ -217,6 +202,31 @@ function depointerize(passes) {
         if (pass.framebuffer.framebuffer !== null) {
             framebufferName = framebuffers.add(pass.framebuffer,pass.name);
         }
+        const callbackName = callbacks.add(pass.draw,pass.name);
+        let shaderName=null,uniforms=null,samplers=null,uniformTypes=null;
+        if (pass.shader !== null) {
+            shaderName = shaders.add(pass.shader,pass.shader.name);
+            // UNIFORMS
+            uniforms = new Map();
+            uniformTypes = new Map();
+            for (const name in pass.uniforms) {
+                // Just forget about unused uniforms.
+                if (!pass.shader.hasUniform(name)) continue;
+                // The shader has it, so let's use it.
+                const vname = variables.add(pass.uniforms[name],name);
+                uniforms.set(name,vname);
+                uniformTypes.set(name,pass.shader.type(name));
+            }
+            // SAMPLERS
+            samplers = new Map();
+            for (const sampler in pass.samplers) {
+                const texture = pass.samplers[sampler];
+                const textureName = textures.add(texture,sampler);
+                const unit = pass.shader.samplers.get(sampler);
+                samplers.set(unit,textureName);
+            }
+        }
+
         // Construct new pass
         depointerized.push({
             name: pass.name,
@@ -357,29 +367,31 @@ class PassRecorder {
     record(pass) {
         const l = this.lines;
         l.push(`// Rendering "${pass.name}"`);
+        // Swap framebuffers if needed
+        if (pass.framebuffer !== this.framebuffer) {
+            this.framebuffer = pass.framebuffer;
+            if (pass.framebuffer === "CANVAS") {
+                l.push(`framebuffer = null;`);
+                l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,null); // Default (canvas) framebuffer`);
+                l.push(`gl.viewport(0.0,0.0,`+
+                       `gl.drawingBufferWidth,gl.drawingBufferHeight);`);
+                l.push(`gl.scissor(0.0,0.0,`+
+                       `gl.drawingBufferWidth,gl.drawingBufferHeight);`);
+            } else {
+                l.push(`framebuffer = env.framebuffers[${
+                        jsString(pass.framebuffer)}];`);
+                l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer.framebuffer);`);
+                l.push(`gl.viewport(0.0,0.0,`+
+                       `framebuffer.width,framebuffer.height);`);
+                l.push(`gl.scissor(0.0,0.0,`+
+                       `framebuffer.width,framebuffer.height);`);
+            }   
+        }
+        
         // If the shader is marked as "don't care" then the uniforms
         // don't need to be set. Hence, shader and uniform setting
         // is gated behind this null check.
         if (pass.shader !== null) { 
-            // Swap framebuffers if needed
-            if (pass.framebuffer !== this.framebuffer) {
-                if (pass.framebuffer === "CANVAS") {
-                    l.push(`framebuffer = null;`);
-                    l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,null); // Default (canvas) framebuffer`);
-                    l.push(`gl.viewport(0,0,`+
-                           `gl.drawingBufferWidth,gl.drawingBufferHeight);`);
-                    l.push(`gl.scissor(0,0,`+
-                           `gl.drawingBufferWidth,gl.drawingBufferHeight);`);
-                } else {
-                    l.push(`framebuffer = env.framebuffers[${
-                            jsString(pass.framebuffer)}].framebuffer;`);
-                    l.push(`gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);`);
-                    l.push(`gl.viewport(0,0,`+
-                           `framebuffer.width,framebuffer.height);`);
-                    l.push(`gl.scissor(0,0,`+
-                           `framebuffer.width,framebuffer.height);`);
-                }   
-            }
             // Swap shaders if needed
             if (pass.shader !== this.shader) {
                 this.shader = pass.shader;

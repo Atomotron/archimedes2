@@ -1,5 +1,5 @@
 // Management of VertexArrayObjects and VertexBufferObjects.
-import {tabulate} from './util.js';
+import {tabulate,isDefined,RingBuffer} from './util.js';
 import {GL_TYPES} from './webgltypes.js';
 import {AttributeSchema} from './shader.js';
 import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
@@ -117,9 +117,10 @@ export class VertexBufferSchema {
         return this.structSize*n;
     }
     // Sets up vertex pointers into a buffer matching this schema.
-    vertexAttribPointer(gl) {
+    vertexAttribPointer(gl,buffer,divisor=0) {
         const FLOAT32_SIZEB = 4; // We only support f32 arrays
         const stride = this.structSize * FLOAT32_SIZEB;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer);
         // Loop once for every struct field we need to set up
         for (let i=0; i<this.names.length; i++) {
             const info = GL_TYPES[this.types[i]];
@@ -129,6 +130,8 @@ export class VertexBufferSchema {
             // This loop runs once for normal types, and N times for matN.
             for (let j=0; j<info.nattributes; j++) {
                 gl.enableVertexAttribArray(this.attributeLocs[i]);
+                gl.ANGLE_instanced_arrays
+                  .vertexAttribDivisorANGLE(this.attributeLocs[i],divisor);
                 gl.vertexAttribPointer(
                     this.attributeLocs[i],
                     size, // components per vertex attribute
@@ -159,7 +162,7 @@ export class VertexBufferSchema {
         return structs;
     }
     // Prints a table of the schema for debugging and development purposes.
-    toString() {
+    toString(title="Vertex Buffer Schema") {
         const rows = [['ID','NAME','SIZE','OFFSET','TYPE','ATTR. LOC.']];
         for (let i=0; i<this.names.length; i++) {
             rows.push([
@@ -167,7 +170,7 @@ export class VertexBufferSchema {
                 GL_TYPES[this.types[i]].name,this.attributeLocs[i],
             ]);
         }
-        return tabulate("Vertex Buffer Schema",rows);
+        return tabulate(title,rows);
     }
 }
 
@@ -257,10 +260,12 @@ export class VertexBuffer {
         gl.deleteBuffer(this.buffer);
     }
     // Synchronizes with buffer backing
-    syncBacking(gl,backing) {
+    sync(gl,backing) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+        //console.log("Sync",backing,'with',this);
         if (backing.array.length !== this.size) {
             // We need to allocate new GPU memory
+            //console.log("New allocation needed.");
             this.size = backing.array.length;
             gl.bufferData(
                 gl.ARRAY_BUFFER,
@@ -268,44 +273,286 @@ export class VertexBuffer {
                 this.usage,
             );
         } else {
+            //console.log("Upload needed.");
             // We can reuse the same memory.
-            gl.bufferSubData(gl.ARRAY_BUFFER, 
+            const sub = backing.array.subarray(
+                    0,backing.sch.sizeof(backing.count)
+            );
+            //console.log(sub);
+            gl.bufferSubData(
+                gl.ARRAY_BUFFER, 
                 0, // No dst offset
-                backing.array.subarray(
-                    0,backing.schema.sizeof(backing.count)
-                ),
+                sub,
             );
         }
+        //console.log("Sync resulted in",this);
     }
 }
 
 export class VertexArraySchema {
     // attrSchema:  AttributeSchema from shader
     // divisors  :  Instanced drawing divisors (default 1)
-    constructor(attributeSchema,divisors) {
-        this.sch = attributeSchema;
-        this.divisors = new Map();
-        for (const name in attrSchema.names) {
-            this.divisors.set(
-                name,
-                typeof divisors[name] === 'undefined' ?
-                    1 : divisors[name], // 1 default, otherwise the given
+    //              Map name -> divisor
+    constructor(attributeSchema,divisors,stream) {
+        // Organize by divisor
+        const divisorGroups = new Map(); // divisor -> Set(names)
+        for (const [name,divisor] of divisors) {
+            const set = divisorGroups.get(divisor) || new Set();
+            set.add(name);
+            divisorGroups.set(divisor,set);
+        }
+        // Group stream flags by divisor
+        // If any are stream, the whole buffer has to be stream.
+        const streamDivisors = new Map(); // divisor -> are any stream?
+        for (const [divisor,names] of divisorGroups) {
+            let anyStream = false;
+            for (const name of names) {
+                if (stream.get(name)) {
+                    anyStream = true;
+                    break;
+                }
+            }
+            streamDivisors.set(divisor,anyStream);
+        }
+        // Create attribute subschemas
+        this.divisorIds = new Map();// divisor -> schema ID
+        this.schemas = [];          // schema ID -> VertexBufferSchemas
+        this.divisors = [];         // schema ID -> instance divisor
+        this.stream = [];          // schema ID -> any stream?
+        this.divisors = Array.from(divisorGroups.keys());
+        this.divisors.sort(); // Always put lowest divisors first
+        // Populate the above
+        for (let i=0; i<this.divisors.length; i++) {
+            const divisor = this.divisors[i];
+            // Make subschema
+            const sch = attributeSchema.subschema(divisorGroups.get(divisor));
+            // Make VertexBufferSchema from subschema
+            const vbs = new VertexBufferSchema(sch);
+            // Populate internal structures
+            this.divisorIds.set(divisor,i);
+            this.schemas.push(vbs);
+            this.stream.push(streamDivisors.get(divisor));
+        }
+    }
+    sizeof(n,divisor=0) {
+        return Math.ceil(n / divisor);
+    }
+    // Print schema for debugging and development purposes
+    toString() {
+        const lines = [`VertexArraySchema with ${this.divisors.length} divisor(s).`];
+        for (let i=0; i<this.divisors.length; i++) {
+            lines.push(this.schemas[i].toString(
+                `Subschema ${i}, ` +
+                `Divisor ${this.divisors[i]}, ` +
+                (this.stream[i] ? 'Streaming' : 'Static')
+            ));
+        }
+        return lines.join('\n\n');
+    }
+    // Sets up VAO, given a list of buffers corresponding to our list of divisors
+    // Arguments:
+    //  gl  : an active webgl context
+    //  vertexBuffers: an array of VertexBuffers with a .buffer attribute
+    //                 of type WebGLBuffer
+    vertexAttribPointers(gl,vertexBuffers) {
+        for (let i=0; i<this.divisors.length; i++) {
+            const buf = vertexBuffers[i];
+            const divisor = this.divisors[i];
+            this.schemas[i].vertexAttribPointer(gl,buf,divisor);
+        }
+    }
+}
+
+export class VertexArrayBacking {
+    // Arguments:
+    //  vertexArraySchema: schema
+    //  vertices         : number of divisor-0 slots to preallocate
+    //  instances        : will preallocate to fit this many instances
+    constructor(vertexArraySchema,vertices=0,instances=0) {
+        this.sch = vertexArraySchema;
+        // Set up vertex and instance backing
+        this.vert = null;
+        this.inst = null;
+        this.buffers = [];
+        this.divisors = [];
+        this.fieldNames = [];
+        for (let i=0; i<this.sch.schemas.length; i++) {
+            const divisor = this.sch.divisors[i];
+            const vbb = new VertexBufferBacking(
+                this.sch.schemas[i],
+                divisor > 0 ?
+                    this.sch.sizeof(instances,divisor) : vertices,
+            );
+            this.divisors.push(divisor);
+            this.buffers.push(vbb);
+            const fieldName = this.nameAt(i);
+            this.fieldNames.push(fieldName);
+            this[fieldName] = vbb;
+        }
+    }
+    nameAt(index) {
+        const div = this.sch.divisors[index];
+        if (div === 0) {
+            return 'vert';
+        } else if (div === 1) {
+            return 'inst';
+        } else {
+            return `d${divisor}`;
+        }
+    }
+    // Checks the count at divisor 0 to determine how many primitive vertices
+    // can be drawn without overrunning the vertex buffer.
+    countVertices() {
+        return this.vert.count;
+    }
+    // Checks the count at each divisor level above 0 to compute the
+    // number of instances that can be drawn without overruning any buffers.
+    countInstances() {
+        let n = null;
+        // Note we're starting at i=1 (instances)
+        for (let i=1; i < this.divisors.length; i++) {
+            const divisor = this.divisors[i];
+            const vbb = this.buffers[i];
+            const instancesHere = divisor * vbb.count;
+            // cut n down to be no greater than the number of instances
+            // populated by this higher divisor
+            if (n === null || n > instancesHere) n = instancesHere;
+        }
+        return n;
+    }
+    // Draws this VAO, using the number of vertices and indices stored here
+    draw(gl,mode,vertexArray) {
+        gl.OES_vertex_array_object
+          .bindVertexArrayOES(vertexArray.vao);
+        const v = this.vert === null ? 1 : this.countVertices();
+        if (this.inst === null) {
+            // uninstanced draw
+            gl.drawArrays(
+                mode, // geometry mode
+                0,    // starting index
+                v,    // number of indices to be rendered\
+            );
+        } else {
+            const i = this.countInstances();
+            if (i === 0) return; // No instances, nothing to draw.
+            gl.ANGLE_instanced_arrays
+              .drawArraysInstancedANGLE(
+                mode, // geometry mode
+                0,    // starting index
+                v,    // number of indices to be rendered
+                i,    // number of instances to execute
             );
         }
     }
-    
 }
 
 // Represents a vertex array object
 export class VertexArray {
-    constructor(vertexSchema) {
-        this.sch = schema;
+    constructor(gl,vertexArraySchema,vertices=0,instances=0) {
+        this.sch = vertexArraySchema;
+        this.VBs = []; // vertex buffers
+        // Construct vertex array buffers
+        for (let i=0; i<this.sch.divisors.length; i++) {
+            const divisor = this.sch.divisors[i];
+            const hint = this.sch.stream[i] ? gl.STREAM_DRAW : gl.DYNAMIC_DRAW;
+            if (divisor === 0) { //vertices
+                this.VBs.push(new VertexBuffer(
+                    gl,hint,vertices
+                ));
+            } else {
+                this.VBs.push(new VertexBuffer(
+                    gl,hint,this.sch.sizeof(instances,divisor)
+                ));
+            }
+        }
+        // Assemble VAO
+        this.vao = gl.OES_vertex_array_object
+                     .createVertexArrayOES();
+        gl.OES_vertex_array_object
+          .bindVertexArrayOES(this.vao);
+        this.sch.vertexAttribPointers(gl,this.VBs);
     }
-    
-    // Calls vertexAttribPointer to set up the internal array
-    pointer(gl,baseIndex,type) {
-
+    destroy(gl) {
+        // Note: You will have to destroy the buffers yourself.
+        gl.OES_vertex_array_object
+          .deleteVertexArray(this.vao);
+    }
+    // Syncronizes all internal buffers with buffer backing
+    sync(gl,backing) {
+        for (let i=0; i<backing.buffers.length; i++) {
+            const vb = this.VBs[i];
+            const vbb = backing.buffers[i];
+            vb.sync(gl,vbb);
+        }
     }
 }
 
+// Triple-buffered VAO/schema/backing collection
+export class Geometry extends VertexArrayBacking {
+    static RING_BUFFER_SIZE = 2; // Triple buffer
+    constructor(gl,attributeSchema,configuration,vertices=0,instances=0) {
+        // Parse configuration
+        const divisors = new Map();
+        const stream = new Map();
+        for (const name of attributeSchema.names) {
+            if (isDefined(configuration[name])) {
+                const info = configuration[name];
+                divisors.set(name,isDefined(info.divisor) ? info.divisor : 1);
+                stream.set(name,isDefined(info.stream)    ? info.stream : true);
+            } else {
+                divisors.set(1); // Default: instance variable
+                stream.set(true); // Better to send too often than too rarely 
+            }
+        }
+        const schema = new VertexArraySchema(attributeSchema,divisors,stream);
+        super(schema,vertices=0,instances=0);
+        // Set up vertex arrays
+        const VAs = [];
+        for (let i=0; i<Geometry.RING_BUFFER_SIZE; i++) {
+            VAs.push(new VertexArray(gl,this.sch,vertices,instances));
+        }
+        this.ring = new RingBuffer(VAs);
+        // Set up dirty flags
+        this.dirtyFlagNames = [];
+        this.dirtyCounters = [];
+        this.stream = this.sch.stream;
+        for (let i=0; i<this.sch.schemas.length; i++) {
+            const name = this.dirtyFlagNameAt(i);
+            this.dirtyFlagNames.push(name);
+            this[name] = false;
+            this.dirtyCounters.push(Geometry.RING_BUFFER_SIZE);
+        }
+    }
+    dirtyFlagNameAt(i) {
+        return this.nameAt(i)+'Dirty';
+    }
+    // Sends updated data to the GPU.
+    sync(gl) {
+        this.ring.next();
+        const vao = this.ring.top();
+        for (let i=0; i < this.buffers.length; i++) {
+            const dirtyFlagName = this.dirtyFlagNames[i];
+            if (this[dirtyFlagName]) {
+                this.dirtyCounters[i] = 3;
+            } else {
+                this[dirtyFlagName] = this.stream[i];
+            }   
+            // Change dirty flag depending on default behavior
+            // If the dirty counter is still >0, we haven't updated all buffers
+            if (this.dirtyCounters[i] > 0) {
+                const backing = this.buffers[i]; // typed array backing store
+                const vb = vao.VBs[i]; // appropriate vertex buffer
+                vb.sync(gl, backing);
+                this.dirtyCounters[i] -= 1;
+            }
+        }
+    }
+    // Makes appropriate draw call
+    draw(gl,mode) {
+        super.draw(gl,mode,this.ring.top());
+    }
+    toString() {
+        return this.sch.toString();
+    }
+}
 

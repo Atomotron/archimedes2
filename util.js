@@ -37,3 +37,49 @@ export function tabulate(title,rows) {
     }
     return lines.join('\n');
 }
+
+// Less verbose undefinedness check.
+export function isDefined(x) {
+    return typeof x !== 'undefined';
+}
+
+export class RingBuffer {
+    // Can be constructed with either a number N (fills with N nulls) 
+    // or an array (fills with the array).
+    constructor(buffer) {
+        if (typeof buffer === 'number') {
+            this.buf = [];
+            for (let i=0; i<buffer; i++) {
+                this.buf.push(null);
+            }
+        } else {
+            this.buf = buffer;
+        }
+        this.i = 0;
+    }
+    // Increments the ring pointer
+    next() {
+        this.i = (this.i+1) % this.buf.length;    
+    }
+    // Advances the ring and puts an element at the pointer location.
+    put(x) {
+        this.buf[this.i] = x;
+    }
+    // Returns the value at the present pointer, the most recently put
+    top() {
+        return this.buf[this.i];
+    }
+    // Writes the ring in present-to-past order to the given array.
+    dump(to=[]) {
+        // The pointer backwards
+        for (let i=this.i; i>=0; i--) {
+            to.push(this.buf[i]);
+        }
+        // The end back to the pointer
+        for (let i=this.buf.length-1; i > this.i; i--) {
+            to.push(i);
+        }
+        return to;
+    }
+    
+}

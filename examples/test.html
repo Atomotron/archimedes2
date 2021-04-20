@@ -21,40 +21,78 @@
 </head>
 <body>
 
-<script id="shader-v" type="x-shader/x-vertex">
+<script id="background-v" type="x-shader/x-vertex">
 #version 100
 #extension GL_OES_standard_derivatives : enable
 precision highp float;
 attribute vec2 vertex;
-uniform float time;
+
+varying vec2 uv;
+
 void main() {
     gl_Position = vec4(vertex,0.0,1.0); 
+    uv = vertex;
 }
 </script>
 
-<script id="shader-f" type="x-shader/x-fragment">
+<script id="background-f" type="x-shader/x-fragment">
 #version 100
 #extension GL_OES_standard_derivatives : enable
 precision highp float;
-uniform float time;
-uniform vec2 centers[3];
+uniform float time[3];
+uniform vec2 center[3];
 uniform sampler2D background;
+
+varying vec2 uv;
+
+float VELOCITY = 0.1;
+float AMPLITUDE = 0.01;
+float WAVENUMBER = 40.0;
+
 void main() {
-    vec2 p = gl_FragCoord.xy-vec2(256,256);
-    float zoom = ( sin(time*0.25)*0.5 )*0.05;
-    vec3 color = vec3(0.0,0.0,0.0);
     vec2 distortion = vec2(0.0,0.0);
     for (int i=0; i<3; i++) {
-        vec2 x = p-centers[i];
-        float r = length(x)*zoom;
-        float f = (sin((r-time*2.0 + atan(x.y,x.x))*3.0) / (r*r))*30.5+0.5;
-        color += vec3(1.0 * f,0.2 * f,0.13);
-        distortion += vec2(0.1*f,0.1*f);
+        float r = length(uv-center[i]);
+        vec2 rhat = normalize(uv-center[i]);
+        float phase = WAVENUMBER*(r-time[i]*VELOCITY);
+        float phase2 = phase * phase;
+        float amp = AMPLITUDE * (1.0-phase2) * exp(-phase2) / r;
+        distortion += rhat*amp;
     }
-    color *= texture2D(background, gl_FragCoord.xy * (1.0/512.0) + distortion).xyz;
-    gl_FragColor = vec4(color,1.0);
+    gl_FragColor = texture2D(background, (uv+distortion)*0.5 + vec2(0.5));
 }
 </script>
+
+<script id="sprite-v" type="x-shader/x-vertex">
+#version 100
+#extension GL_OES_standard_derivatives : enable
+precision highp float;
+
+attribute vec2 vertex;
+attribute vec4 transform;
+attribute vec2 translate;
+attribute vec4 color;
+
+varying vec4 vcolor;
+
+void main() {
+    vcolor = color;
+    gl_Position = vec4(mat2(transform)*vertex + translate,0.0,1.0);
+}
+</script>
+
+<script id="sprite-f" type="x-shader/x-fragment">
+#version 100
+#extension GL_OES_standard_derivatives : enable
+precision highp float;
+
+varying vec4 vcolor;
+
+void main() {
+    gl_FragColor = vcolor;
+}
+</script>
+
 <canvas id='canvas' width=512 height=512></canvas>
 <img id='tex' src="./tools-861x599-martin-vorel.jpg" alt="texture image" style="display:none;"></img>
 

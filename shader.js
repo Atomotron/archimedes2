@@ -1,6 +1,7 @@
 import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
 import {GL_TYPES} from './webgltypes.js';
 import {tabulate} from './util.js';
+import {Geometry} from './vertices.js';
 /*
 Depends on:
 - `vector.js`
@@ -53,13 +54,13 @@ export class AttributeSchema {
     }
     // Returns a sub-schema where only the given names are included.
     subschema(names) {
-        const t = new Map(this.types.entries()
-            .filter( ([k,v]) => names.has(k) )
-        );
-        const l = new Map(this.locations.entries()
-            .filter( ([k,v]) => names.has(k) )
-        );
-        return new AttributeSchema(names,t,l);
+        const t = new Map();
+        const l = new Map();
+        for (const name of names) {
+            t.set(name,this.types.get(name));
+            l.set(name,this.locations.get(name));
+        }
+        return new AttributeSchema(t,l);
     }
     toString() {
         const rows = [["NAME","ATTRIBUTE TYPE","LOCATION"]];
@@ -195,6 +196,16 @@ export class Shader {
         lines.push(tabulate("Samplers",stable));
         return lines.join('\n\n');
     } 
+    // Convienience constructor for Geometry class
+    geometry(gl,configuration,vertices=0,instances=0) {
+        return new Geometry(
+            gl,
+            this.attributeSchema,
+            configuration,
+            vertices,
+            instances,
+        );
+    }
 }
 // Returns an object full of `Shader`s, built from compiling the given sources.
 // Arguments:

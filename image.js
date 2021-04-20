@@ -73,6 +73,7 @@ export function resizeImage(width,height,image,stretch=true) {
     tempCanvas.width = width;
     tempCanvas.height = height;
     const ctx = tempCanvas.getContext('2d',{alpha:true,desynchronized:true});
+    ctx.imageSmoothingEnabled = true;
     if (!stretch)
         ctx.clearRect(0,0,width,height); // transparent black
     if (stretch)
@@ -249,40 +250,17 @@ export class Framebuffer {
         this.maxV = 1.0; // v coordinate ranges up to 1
         this.hasDepthstencil = hasDepthstencil;
         this.hasTexture = true;
+        this.hasFramebuffer = true;
         // Create color attachment (image texture)
         //gl.activeTexture(gl.TEXTURE0); //It doesn't matter which texture unit
         this.texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0, // framebuffers work on mip level 0
-            gl.RGBA, //Only RGBA framebuffer support is guaranteed
-            width,height,
-            0, // border, must be 0
-            gl.RGBA, //must be the same as internalformat above
-            gl.UNSIGNED_BYTE, // the only guaranteed supported type
-            null, // don't upload any pixels
-        );
-        // Disable all the stuff that doesn't work with non-power-of-two textures
-        // (mipmapping is unsuppored for framebuffers anyway because they always
-        //  draw to mip level 0, so the only remaining true loss is gl.REPEAT.)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         // Generate depth/stencil attachment if requested
         this.dsRenderbuffer = null; 
         if (this.hasDepthstencil) {
             // create render buffer
             this.dsRenderbuffer = gl.createRenderbuffer();
-            gl.bindRenderbuffer(gl.RENDERBUFFER,this.dsRenderbuffer);
-            gl.renderbufferStorage(
-                gl.RENDERBUFFER,
-                gl.DEPTH_STENCIL,
-                width,
-                height,
-            );
-        }      
+        }
+        this.allocate(gl);
         // Create framebuffer
         this.framebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer);
@@ -305,21 +283,46 @@ export class Framebuffer {
         if (status !== gl.FRAMEBUFFER_COMPLETE) {
             console.error(`Framebuffer creation failed with code ${status}.`);
         }
-        // Attach and clear framebuffer to put it in a known state.
-        // Framebuffer is still bound from above.
-        gl.clearColor(0.0,0.0,0.0,0.0); // Transparent black
+    }
+    // Sets up framebuffer
+    allocate(gl) {
+        // TEXTURE
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0, // framebuffers work on mip level 0
+            gl.RGBA, //Only RGBA framebuffer support is guaranteed
+            this.width,this.height,
+            0, // border, must be 0
+            gl.RGBA, //must be the same as internalformat above
+            gl.UNSIGNED_BYTE, // the only guaranteed supported type
+            null, // don't upload any pixels
+        );
+        // Disable all the stuff that doesn't work with non-power-of-two textures
+        // (mipmapping is unsuppored for framebuffers anyway because they always
+        //  draw to mip level 0, so the only remaining true loss is gl.REPEAT.)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        // RENDERBUFFER (depth/stencil)
         if (this.hasDepthstencil) {
-            /* The  state  required  for  clearing  is  a  clear  value  for  each  of  the  color  buffer,the depth buffer, and the stencil buffer */
-            // The above implies that glEnable is NOT needed to clear buffers.
-            gl.clearDepth(1.0); // Greatest depth
-            gl.clearStencil(0); 
-            gl.clear(gl.COLOR_BUFFER_BIT | 
-                     gl.DEPTH_BUFFER_BIT | 
-                     gl.STENCIL_BUFFER_BIT
+            gl.bindRenderbuffer(gl.RENDERBUFFER,this.dsRenderbuffer);
+            gl.renderbufferStorage(
+                gl.RENDERBUFFER,
+                gl.DEPTH_STENCIL,
+                this.width,
+                this.height,
             );
-        } else {
-            gl.clear(gl.COLOR_BUFFER_BIT);
         }
+    }
+    resize(gl,width,height) {
+        if (this.width === width && this.height === height) {
+            return; // No need to do anything.
+        }
+        this.width = width;
+        this.height = height;
+        this.allocate(gl);
     }
     destroy(gl) {
         gl.deleteFramebuffer(this.framebuffer);
@@ -327,17 +330,5 @@ export class Framebuffer {
         if (this.dsRenderbuffer !== null) {
             gl.deleteRenderbuffer(this.dsRenderbuffer);
         }
-    }
-}
-
-
-// A render target, which can be a sequence of framebuffers stretching back
-// into the past. This is useful for feedback loops where f_{t} depends on
-// f_{t-1}, the value of the buffer at an earlier point in time.
-// It also permits resizing of the underlying framebuffer, and delayed
-// garbage collection.
-class Target {
-    constructor() {
-    
     }
 }
