@@ -50,7 +50,7 @@ function printTreeLines(tree,indent='') {
             data = v.toString().split('\n');
         }
         if (data.length === 1) {
-            lines.push(header + data[0]);
+            lines.push(header + ' ' + data[0]);
         } else {
             lines.push(header);
             for (const row of data) {
