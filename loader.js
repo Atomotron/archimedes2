@@ -1,5 +1,6 @@
 import {isDefined,printTree} from './util.js';
 import {compileShaders} from './shader.js';
+import {Texture} from './image.js';
 
 // Routines for loading resources and setting things up
 // Attempts to create a webgl context with some common extensions.
@@ -72,16 +73,43 @@ export function getContext(canvas) {
     return {gl:gl,messages:messages};
 }
 
-function getTexAtUrl(url) {
+function asyncXMLHttpRequest(url,type) {
     return new Promise( (resolve, reject) => {
         const request = new XMLHttpRequest();
         request.open('GET',url,true);
-        request.responseType = 'text';
+        request.responseType = type;
         request.onload = () => resolve(request.response);
         request.error = () => reject(request.statusText);
         request.send();
     })
+}
 
+async function getTextAtUrl(url) {
+    return await asyncXMLHttpRequest(url,'text');
+}
+
+// Will return either an ImageBitmap or an HTMLImageElement
+async function getImageAtUrl(url) {
+    const response = await asyncXMLHttpRequest(url,'blob');
+    if (isDefined(createImageBitmap)) { // Non-safari-users get the good route
+        return createImageBitmap(response);
+    } else { // Safari users get the hack
+        function imageFromBlob(blob) {
+            const img = new Image();
+            const dataUrl = URL.createObjectURL(blob);
+            const promise = new Promise(
+                resolve => {
+                    img.onload = () => {
+                        URL.revokeObjectURL(dataUrl);
+                        resolve(img);
+                    }
+                }
+            );
+            img.src = dataUrl;
+            return promise;
+        }
+        return await imageFromBlob(response);
+    }
 }
 
 // Returns a promise that resolves to a string
@@ -92,7 +120,18 @@ async function loadStringResource(resource) {
         // Get the inner text
         return resource.textContent;
     } else if (resource instanceof URL) {
-        return await getTexAtUrl(resource);
+        return await getTextAtUrl(resource);
+    } else {
+        throw "Attempted to load unrecognized type.";
+    }
+}
+
+// Returns a promise that resolves to an image resource
+async function loadImageResource(resource) {
+    if (resource instanceof HTMLImageElement) {
+        return resource;
+    } else if (resource instanceof URL) {
+        return await getImageAtUrl(resource);
     } else {
         throw "Attempted to load unrecognized type.";
     }
@@ -124,15 +163,17 @@ async function loadResources(resources,loader,progressCallback) {
 }
 
 class Resources {
-    constructor(gl,shaders) {
+    constructor(gl,shaders,images) {
         this.gl = gl;
         this.shaders = shaders;
+        this.images = images;
     }
 }
 
 const defaultProgressCallbacks = {
     vertex : (loaded,total) => console.log(`Loaded ${loaded}/${total} vertex shader sources.`),
     fragment : (loaded,total) => console.log(`Loaded ${loaded}/${total} fragment shader sources.`),
+    image : (loaded,total) => console.log(`Loaded ${loaded}/${total} images.`),
 }
 
 export async function load(settings,progressCallbacks={}) {
@@ -183,6 +224,17 @@ export async function load(settings,progressCallbacks={}) {
         errors.set("settings",`missing attribute "shaders"`);
     }
     
+    // Images
+    if (isDefined(settings.images)) {
+        promises.set('images',loadResources(
+            settings.images,
+            loadImageResource,
+            progressCallbacks.image,
+        ));
+    } else {
+        errors.set("settings",`missing attribute "images"`);
+    }
+    
     
     // Sort promises into errors and results
     for (const [name,promise] of promises) {
@@ -194,6 +246,7 @@ export async function load(settings,progressCallbacks={}) {
     }
     
     // Loading stage 2: Resource processing.
+    // Shaders
     let shaders = null;
     if (gl !== null 
         && results.has('vertex-sources') 
@@ -209,6 +262,18 @@ export async function load(settings,progressCallbacks={}) {
     } else { 
         errors.set('compile-shaders','earlier failures prevent shader compilation');
     }
+    // Images -> Texture objects
+    let images = {};
+    if (gl !== null && results.has('images')) {
+        for (const [name,image] of results.get('images')) {
+            let imageSettings = {};
+            if (settings.imageSettings && settings.imageSettings[name]) {
+                imageSettings = settings.imageSettings[name];
+            }
+            images[name] = new Texture(gl,image,imageSettings);
+        }
+    }
+    
     // If there are any errors, format them into a tree and return the message.
     if (errors.size > 0) {
         throw printTree(errors);
@@ -216,5 +281,6 @@ export async function load(settings,progressCallbacks={}) {
     return new Resources(
         gl,
         shaders,
+        images,
     );
 }

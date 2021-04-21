@@ -24,7 +24,14 @@ load({
             sf:document.querySelector('#sprite-f'),
         },
         programs: {background:['bv','bf'],sprite:['sv','sf']},
-    }
+    },
+    images: {
+        tools: document.getElementById('tex'),
+        smile: new URL("smile.png", document.baseURI),
+    },
+    imageSettings: {
+    
+    },
 }).then( (res) => {
     const gl = res.gl;
     const shaders = res.shaders;
@@ -33,11 +40,7 @@ load({
     // Framebuffer
     const fb = new Framebuffer(gl,128,128);
     // Texture
-    const tex = new Texture(
-        gl,
-        document.getElementById('tex'),
-        {stretch:true}
-    );
+    const tex = res.images['tools'];
     
     // VBS test
     const bgGeom = bgShader.geometry(gl,{vertex:{divisor:0,stream:false}},4);
@@ -53,7 +56,7 @@ load({
         translate   :{divisor:1,stream:true},
         transform   :{divisor:1,stream:true},
         color       :{divisor:1,stream:true},
-    });
+    },4,1024*4);
     spriteGeom.vert.acquire().vertex.eqFrom(-1.0,-1.0);
     spriteGeom.vert.acquire().vertex.eqFrom( 1.0,-1.0);
     spriteGeom.vert.acquire().vertex.eqFrom(-1.0, 1.0,);
@@ -98,7 +101,7 @@ load({
             draw: (gl) => {
                 spriteGeom.draw(gl,gl.TRIANGLE_STRIP);
             },
-            samplers: {},
+            samplers: {spritesheet: res.images.smile},
         },
         {   name:"Swirl",
             framebuffer: canvasFb,
