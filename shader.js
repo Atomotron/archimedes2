@@ -210,39 +210,28 @@ export class Shader {
 // Returns an object full of `Shader`s, built from compiling the given sources.
 // Arguments:
 //  gl            : webgl context
-//  vshaderSources: object mapping vertex shader names to GLSL sources
-//  fshaderSources: object mapping fragment shader names to GLSL sources
-//  programPairs  : object mapping shader program names to pairs like,
+//  vshaderSources: Map mapping vertex shader names to GLSL sources
+//  fshaderSources: Map mapping fragment shader names to GLSL sources
+//  programPairs  : Map mapping shader program names to pairs like,
 //                      ['fshader_name','vshader_name']
-// Example invocation:
-//  const shaders = compileShaders(
-//      gl,
-//      {vertshader:document.querySelector('#shader-v').textContent},
-//      {fragshader:document.querySelector('#shader-f').textContent},
-//      {myshader:['vertshader','fragshader']},
-//  );
-//  // shaders ==> {myshader: [object Shader]}
 export function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
     let errors = 0;
     // Verify that sources are actually strings
     function checkTypes(sources,type) {
-        for (const name in sources) {
-                if (typeof sources[name] !== 'string') {
+        for (const [name,source] of sources) {
+                if (typeof source !== 'string') {
                     errors += 1;
-                    console.error(`The source code of ${type} shader "${name}" isn't a string; it's`,sources[name]);
-                    delete sources[name];
+                    console.error(`The source code of ${type} shader "${name}" isn't a string; it's`,source);
+                    sources.delete(name);
                 }
             }
     }
-    checkTypes(vshaderSources,'vertex');
-    checkTypes(fshaderSources,'fragment');
     // Log program mismatches
-    for (const name in programPairs) {
-        const [vname,fname] = programPairs[name];
-        const [has_v,has_f] = [vname in vshaderSources,fname in fshaderSources];
+    for (const [name,[vname,fname]] of programPairs) {
+        const [has_v,has_f] = [vshaderSources.has(vname),fshaderSources.has(fname)];
         if (!has_v || !has_f) {
             errors += 1;
-            delete programPairs[name]; // Don't bother compiling it.
+            programPairs.delete(name); // Don't bother compiling it.
         }
         if (!has_v) {
             console.error(`Program "${name}" requires missing vertex shader "${vname}".`);
@@ -254,9 +243,9 @@ export function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
     // Compile vertex and fragment shaders
     function compileStageShaders(sources,type) {
         const shaders = new Map();
-        for (const name in sources) {
+        for (const [name,source] of sources) {
             const s = gl.createShader(type);
-            gl.shaderSource(s,sources[name]);
+            gl.shaderSource(s,source);
             gl.compileShader(s);
             shaders.set(name,s);
         }
@@ -266,8 +255,7 @@ export function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
     const fshaders = compileStageShaders(fshaderSources,gl.FRAGMENT_SHADER);
     // Link shaders into programs.
     const programs = new Map();
-    for (const name in programPairs) {
-        const [vname,fname] = programPairs[name]; // unpack program pair
+    for (const [name,[vname,fname]] of programPairs) {
         if (!vshaders.has(vname) || !fshaders.has(fname)) {
             continue;
         }
