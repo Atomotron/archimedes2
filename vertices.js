@@ -273,16 +273,14 @@ export class VertexBuffer {
                 this.usage,
             );
         } else {
-            //console.log("Upload needed.");
-            // We can reuse the same memory.
-            const sub = backing.array.subarray(
-                    0,backing.sch.sizeof(backing.count)
-            );
-            //console.log(sub);
+            // This used to only upload a sub-array, but the allocation
+            // of the sub-array was causing expensive full-pass cycle
+            // garbage collections! It is better for performance to
+            // always upload the entire array.
             gl.bufferSubData(
                 gl.ARRAY_BUFFER, 
                 0, // No dst offset
-                sub,
+                backing.array,
             );
         }
         //console.log("Sync resulted in",this);
