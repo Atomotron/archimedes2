@@ -72,15 +72,27 @@ export function getContext(canvas) {
     return {gl:gl,messages:messages};
 }
 
+function getTexAtUrl(url) {
+    return new Promise( (resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open('GET',url,true);
+        request.responseType = 'text';
+        request.onload = () => resolve(request.response);
+        request.error = () => reject(request.statusText);
+        request.send();
+    })
+
+}
+
 // Returns a promise that resolves to a string
 async function loadStringResource(resource) {
     if (typeof resource === 'string') {
-        return new resource;
+        return resource;
     } else if (resource instanceof HTMLElement) {
         // Get the inner text
-        return new resource.textContent;
+        return resource.textContent;
     } else if (resource instanceof URL) {
-        throw "Not implemented.";
+        return await getTexAtUrl(resource);
     } else {
         throw "Attempted to load unrecognized type.";
     }
@@ -93,7 +105,6 @@ async function loadResources(resources,loader,progressCallback) {
     const promises = new Map();
     for (const name in resources) {
         const resource = resources[name];
-        nTotal += 1; // Count resource
         promises.set(name,loader(resource));        
     }
     const errors = new Map();
@@ -113,18 +124,23 @@ async function loadResources(resources,loader,progressCallback) {
 }
 
 class Resources {
-    constructor(gl) {
+    constructor(gl,shaders) {
         this.gl = gl;
+        this.shaders = shaders;
     }
 }
 
-const defaultCallbacks = {
-    
+const defaultProgressCallbacks = {
+    vertex : (loaded,total) => console.log(`Loaded ${loaded}/${total} vertex shader sources.`),
+    fragment : (loaded,total) => console.log(`Loaded ${loaded}/${total} fragment shader sources.`),
 }
 
-export async function load(settings,callbacks={}) {
+export async function load(settings,progressCallbacks={}) {
+    progressCallbacks = Object.assign(progressCallbacks,defaultProgressCallbacks);
+    // Loading stage 1: Network requests
     const errors = new Map();
     const promises = new Map();
+    const results = new Map();
     
     // Canvas and context
     let gl = null;
@@ -137,16 +153,68 @@ export async function load(settings,callbacks={}) {
             for (const m of messages) console.warn(m);
         }
     } else {
-        errors.set("settings","missing attribute `canvas`");
+        errors.set("settings",'missing attribute "canvas"');
     }
     // Shaders
+    // Get source strings
+    if (isDefined(settings.shaders)) {
+        for (const type of ['vertex','fragment']) {
+            if (isDefined(settings.shaders[type])) {
+                promises.set(type+'-sources',loadResources(
+                    settings.shaders[type],
+                    loadStringResource,
+                    progressCallbacks[type],
+                ));
+            } else {
+                errors.set("settings.shaders",`missing attribute "${type}"`);
+            }
+        }
+        if (isDefined(settings.shaders.programs)) {
+            // Convert to map
+            const programs = new Map();
+            for (const name in settings.shaders.programs) {
+                programs.set(name,settings.shaders.programs[name]);
+            }
+            results.set('program-pairs',programs);
+        } else {
+            errors.set('settings.shaders',`missing attribute "program-pairs"`);
+        }
+    } else {
+        errors.set("settings",`missing attribute "shaders"`);
+    }
     
     
+    // Sort promises into errors and results
+    for (const [name,promise] of promises) {
+        try {
+            results.set(name,await promise);
+        } catch (e) {
+            errors.set(name,e);
+        }
+    }
+    
+    // Loading stage 2: Resource processing.
+    let shaders = null;
+    if (gl !== null 
+        && results.has('vertex-sources') 
+        && results.has('fragment-sources')
+        && results.has('program-pairs')
+    ) {
+        shaders = compileShaders(
+            gl,
+            results.get('vertex-sources'),
+            results.get('fragment-sources'),
+            results.get('program-pairs'),
+        );
+    } else { 
+        errors.set('compile-shaders','earlier failures prevent shader compilation');
+    }
     // If there are any errors, format them into a tree and return the message.
     if (errors.size > 0) {
         throw printTree(errors);
     }
     return new Resources(
         gl,
+        shaders,
     );
 }

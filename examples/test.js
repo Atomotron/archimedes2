@@ -12,16 +12,22 @@ import {
 } from '../archimedes.js';
 
 // Test shader compiler
-load({canvas:document.querySelector("canvas")}).then( (res) => {
+load({
+    canvas:document.querySelector("canvas"),
+    shaders: {
+        vertex: {
+            bv:document.querySelector('#background-v'),
+            sv: new URL("sprite.vert", document.baseURI),
+        },
+        fragment:{
+            bf:document.querySelector('#background-f'),
+            sf:document.querySelector('#sprite-f'),
+        },
+        programs: {background:['bv','bf'],sprite:['sv','sf']},
+    }
+}).then( (res) => {
     const gl = res.gl;
-    const shaders = compileShaders(
-        gl,
-        {bv:document.querySelector('#background-v').textContent,
-         sv:document.querySelector('#sprite-v').textContent},
-        {bf:document.querySelector('#background-f').textContent,
-         sf:document.querySelector('#sprite-f').textContent},
-        {background:['bv','bf'],sprite:['sv','sf']},
-    );
+    const shaders = res.shaders;
     const bgShader = shaders.background;
     console.log(shaders.background.toString());
     // Framebuffer

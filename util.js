@@ -10,7 +10,7 @@ function printTreeLines(tree,indent='') {
         const header = `${indent}${k}:`;
         let data;
         if (v instanceof Map) {
-            data = printTree(v,nextIndent);
+            data = printTreeLines(v,nextIndent);
         } else {
             data = v.toString().split('\n');
         }
