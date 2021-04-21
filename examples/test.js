@@ -100,6 +100,7 @@ load({
             draw: (gl) => {
                 spriteGeom.draw(gl,gl.TRIANGLE_STRIP);
             },
+            uniforms: {t:time},
             samplers: {spritesheet: res.images.smile},
         }),
         ClearPass,
@@ -149,10 +150,10 @@ load({
             s.translate.eqFrom(Math.random(),Math.random())
                 .mulEq(2)
                 .addEq(offset);
-            s.transform.eqFrom(Math.random(),Math.random(),
-                               Math.random(),Math.random()).mulEq(0.1);
-            s.color.eqFrom(Math.random()*0.2+0.1,Math.random()*0.6+0.1,
-                           Math.random()*1.0,Math.random());
+            s.transform.eqFrom(Math.random()-0.5+1,Math.random()-0.5,
+                               Math.random()-0.5,Math.random()-0.5+1).mulEq(0.1);
+            s.color.eqFrom(Math.random(),Math.random(),
+                           Math.random(),Math.random());
             // Upload data and render            
             times[0].x += dt;         
             times[1].x += dt;         

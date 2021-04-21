@@ -51,8 +51,8 @@ float AMPLITUDE = 0.1;
 float WAVENUMBER = 20.0;
 
 void main() {
-    float wave = 0.01*sin((uv.x*10.0/uv.y-t));
-    vec2 distortion = vec2(wave,0.3*wave);
+    float wave = sin((uv.x*10.0/uv.y-t));
+    vec2 distortion = uv*0.1*wave;
     for (int i=0; i<3; i++) {
         float r = length(uv-center[i]);
         vec2 rhat = normalize(uv-center[i]);
