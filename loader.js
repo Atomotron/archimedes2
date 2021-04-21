@@ -2,6 +2,20 @@ import {isDefined,printTree} from './util.js';
 import {compileShaders} from './shader.js';
 import {Texture} from './image.js';
 
+// Safari compatibility check.
+try {
+    class A {
+        static X = 1.0;
+    }
+} catch (e) {
+    window.alert("Are you running an old version of Safari?\n" + 
+        "You browser does not support static public fields\n" +
+        "which was fixed in Webkit on 2020-11-17:\n" +
+        "https://bugs.webkit.org/show_bug.cgi?id=194095"
+    );
+}
+
+
 // Routines for loading resources and setting things up
 // Attempts to create a webgl context with some common extensions.
 // Returns {gl:null,messages:[...]} if creation failed (messages will explain why),
