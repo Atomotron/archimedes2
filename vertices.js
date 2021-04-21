@@ -334,7 +334,7 @@ export class VertexArraySchema {
             this.stream.push(streamDivisors.get(divisor));
         }
     }
-    sizeof(n,divisor=0) {
+    sizeof(n,divisor=1) {
         return Math.ceil(n / divisor);
     }
     // Print schema for debugging and development purposes
@@ -505,7 +505,7 @@ export class Geometry extends VertexArrayBacking {
             }
         }
         const schema = new VertexArraySchema(attributeSchema,divisors,stream);
-        super(schema,vertices=0,instances=0);
+        super(schema,vertices,instances);
         // Set up vertex arrays
         const VAs = [];
         for (let i=0; i<Geometry.RING_BUFFER_SIZE; i++) {
