@@ -204,27 +204,10 @@ export class Texture {
 // interface (with hasFramebuffer = true, and so on.)
 export class CanvasRenderbuffer {
     constructor(gl) {
-        this.gl = gl; // Normally we don't do this, but this is our only handle.
         this.hasFramebuffer = true;
         this.hasTexture = false;
-        this.framebuffer = null; // This signifies the canvas RB
-        // Get info about the default framebuffer
-        // note: It's not possible to do this with the normal
-        // "getFramebufferAttachmentParameter" query, because
-        // "querying against the default framebuffer is not allowed
-        // in webgl 1." (- firefox error message)
-        const info = gl.getContextAttributes();
-        // TODO: Change the renderbuffer system so that stuff
-        //       will not mysteriously stop working if a context
-        //       is created with depth but no stencil or stencil
-        //       with no depth.
-        this.hasDepthstencil = info.depth && info.stencil;
-    }
-    get width() {
-        return this.gl.drawingBufferWidth;
-    }
-    get height() {
-        return this.gl.drawingBufferHeight;
+        this.framebuffer = null;
+        this.hasDepthstencil = null;
     }
 }
 

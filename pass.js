@@ -1,5 +1,6 @@
 import {GL_TYPES} from './webgltypes.js';
 import {Shader} from './shader.js';
+import {CanvasRenderbuffer} from './image.js';
 /*
 # Render Pass Sequence Compiler
 */
@@ -34,6 +35,27 @@ import {Shader} from './shader.js';
       uniformTypes: Map<uniform name -> uniform type>,
 }```
 */
+
+const cfb = new CanvasRenderbuffer();
+// Template passes
+export const ClearPass = {   
+    name:"Clear",
+    framebuffer: cfb,
+    shader: null,
+    uniforms: {},
+    draw: (gl) => {
+        gl.clearColor(0.0,0.0,0.0,0.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    },
+    samplers: {},
+};
+
+export const DrawPass = {   
+    name:"Draw",
+    framebuffer: cfb,
+    samplers: {},
+    uniforms: {},
+};
 
 // From joliss' NPM module "js-string-escape" with slight modifications
 // https://github.com/joliss/js-string-escape/blob/master/index.js

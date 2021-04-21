@@ -15,7 +15,6 @@ try {
     );
 }
 
-
 // Routines for loading resources and setting things up
 // Attempts to create a webgl context with some common extensions.
 // Returns {gl:null,messages:[...]} if creation failed (messages will explain why),

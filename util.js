@@ -1,3 +1,38 @@
+function isBareObject(obj) {
+    return obj !== null &&
+           typeof obj === "object" &&
+           Object.getPrototypeOf(obj) === Object.prototype;
+}
+
+function deepAssign(target,source) {
+    for (const name in source) {
+        // Combine what needs to be combined
+        if (name in target
+            && isBareObject(target[name])
+            && isBareObject(source[name])) {
+            deepAssign(target[name],source[name]);
+        } else {
+            // Write the rest
+            if (isBareObject(source[name])) {
+                // Deep copy
+                target[name] = {};
+                deepAssign(target[name],source[name]);
+            } else {
+                target[name] = source[name]; // Shallow
+            }
+        }
+    }
+}
+
+// Deep-combine several objects, the ones to the right overwriting the ones to the left.
+export function SUM(...args) {
+    const result = {};
+    for (const a of args) {
+        deepAssign(result,a);
+    }
+    return result;
+}
+
 // Format and print a tree structre that's made of maps of (strings and maps of (...))
 export function printTree(tree) {
     return printTreeLines(tree,'').join('\n');
@@ -111,3 +146,5 @@ export class RingBuffer {
     }
     
 }
+
+

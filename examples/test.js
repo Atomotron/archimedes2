@@ -5,6 +5,8 @@ import {
     CanvasRenderbuffer,Framebuffer,Texture,
     compileRenderer,
     Geometry,
+    // Passes
+    SUM,DrawPass,ClearPass,
     // Math
     Vec1,Vec2,Vec3,Vec4,
     Vec1I,Vec2I,Vec3I,Vec4I,
@@ -90,37 +92,19 @@ load({
     const canvasFb = new CanvasRenderbuffer(gl);
     // Render environment
     const sequence = [
-        {   name:"Clear",
-            framebuffer: frame,
-            shader: null,
-            uniforms: {},
-            draw: (gl) => {
-                gl.clearColor(0.0,0.1,0.2,0.0);
-                gl.clear(gl.COLOR_BUFFER_BIT);
-            },
-            samplers: {},
-        },
-        {   name:"Sprites",
+        SUM(ClearPass,{framebuffer: frame}),
+        SUM(DrawPass,{
+            name: "Sprites",
             framebuffer: frame,
             shader:shaders.sprite,
-            uniforms: {},
             draw: (gl) => {
                 spriteGeom.draw(gl,gl.TRIANGLE_STRIP);
             },
             samplers: {spritesheet: res.images.smile},
-        },
-        {   name:"ClearCanvas",
-            framebuffer: canvasFb,
-            shader: null,
-            uniforms: {},
-            draw: (gl) => {
-                gl.clearColor(0.0,0.0,0.02,0.0);
-                gl.clear(gl.COLOR_BUFFER_BIT);
-            },
-            samplers: {},
-        },
-        {   name:"Swirl",
-            framebuffer: canvasFb,
+        }),
+        ClearPass,
+        SUM(DrawPass,{
+            name:"Swirl",
             shader:bgShader,
             uniforms: {
                 t: time,
@@ -135,7 +119,7 @@ load({
                 bgGeom.draw(gl,gl.TRIANGLE_STRIP);
             },
             samplers: {background: frame},
-        },
+        }),
     ];
     window.gl = gl;
     const [render,env] = compileRenderer(sequence);
