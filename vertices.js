@@ -488,21 +488,8 @@ export class VertexArray {
 // Triple-buffered VAO/schema/backing collection
 export class Geometry extends VertexArrayBacking {
     static RING_BUFFER_SIZE = 2; // Triple buffer
-    constructor(gl,attributeSchema,configuration,vertices=0,instances=0) {
+    constructor(gl,schema,vertices=0,instances=0) {
         // Parse configuration
-        const divisors = new Map();
-        const stream = new Map();
-        for (const name of attributeSchema.names) {
-            if (isDefined(configuration[name])) {
-                const info = configuration[name];
-                divisors.set(name,isDefined(info.divisor) ? info.divisor : 1);
-                stream.set(name,isDefined(info.stream)    ? info.stream : true);
-            } else {
-                divisors.set(1); // Default: instance variable
-                stream.set(true); // Better to send too often than too rarely 
-            }
-        }
-        const schema = new VertexArraySchema(attributeSchema,divisors,stream);
         super(schema,vertices,instances);
         // Set up vertex arrays
         const VAs = [];

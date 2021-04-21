@@ -3,8 +3,8 @@
 import {
     load,
     CanvasRenderbuffer,Framebuffer,Texture,
-    compileShaders, compileRenderer,
-    
+    compileRenderer,
+    Geometry,
     // Math
     Vec1,Vec2,Vec3,Vec4,
     Vec1I,Vec2I,Vec3I,Vec4I,
@@ -43,7 +43,7 @@ load({
     const tex = res.images['tools'];
     
     // VBS test
-    const bgGeom = bgShader.geometry(gl,{vertex:{divisor:0,stream:false}},4);
+    const bgGeom = new Geometry(gl,bgShader.schema({vertex:{divisor:0,stream:false}}),4);
     bgGeom.vert.acquire().vertex.eqFrom(-1.0,-1.0);
     bgGeom.vert.acquire().vertex.eqFrom( 1.0,-1.0);
     bgGeom.vert.acquire().vertex.eqFrom(-1.0, 1.0,);
@@ -51,12 +51,17 @@ load({
     bgGeom.sync(gl); // It's static, so we only need to call it once.
     
     // Sprites
-    const spriteGeom = shaders.sprite.geometry(gl, {
-        vertex      :{divisor:0,stream:false},
-        translate   :{divisor:1,stream:true},
-        transform   :{divisor:1,stream:true},
-        color       :{divisor:1,stream:true},
-    },4,1024*4);
+    const spriteGeom = new Geometry(
+        gl,
+        shaders.sprite.schema({
+            vertex      :{divisor:0,stream:false},
+            translate   :{divisor:1,stream:true},
+            transform   :{divisor:1,stream:true},
+            color       :{divisor:1,stream:true},
+        }),
+        4,
+        1024*4
+    );
     spriteGeom.vert.acquire().vertex.eqFrom(-1.0,-1.0);
     spriteGeom.vert.acquire().vertex.eqFrom( 1.0,-1.0);
     spriteGeom.vert.acquire().vertex.eqFrom(-1.0, 1.0,);

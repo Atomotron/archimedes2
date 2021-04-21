@@ -1,7 +1,7 @@
 import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
 import {GL_TYPES} from './webgltypes.js';
-import {tabulate} from './util.js';
-import {Geometry} from './vertices.js';
+import {tabulate,isDefined} from './util.js';
+import {VertexArraySchema} from './vertices.js';
 /*
 Depends on:
 - `vector.js`
@@ -197,13 +197,21 @@ export class Shader {
         return lines.join('\n\n');
     } 
     // Convienience constructor for Geometry class
-    geometry(gl,configuration,vertices=0,instances=0) {
-        return new Geometry(
-            gl,
+    schema(configuration={}) {
+        const divisors=new Map(), stream=new Map();
+        for (const name of this.attributeSchema.names) {
+            if (isDefined(configuration[name])) {
+                const info = configuration[name];
+                divisors.set(name,isDefined(info.divisor) ? info.divisor : 1);
+                stream.set(name,isDefined(info.stream)    ? info.stream : true);
+            } else {
+                divisors.set(1); // Default: instance variable
+                stream.set(true); // Better to send too often than too rarely 
+            }
+        }
+        return new VertexArraySchema(
             this.attributeSchema,
-            configuration,
-            vertices,
-            instances,
+            divisors,stream,
         );
     }
 }
