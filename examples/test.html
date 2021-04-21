@@ -51,7 +51,7 @@ float AMPLITUDE = 0.1;
 float WAVENUMBER = 20.0;
 
 void main() {
-    float wave = 0.01*sin((uv.x*10.0-t)/uv.y);
+    float wave = 0.01*sin((uv.x*10.0/uv.y-t));
     vec2 distortion = vec2(wave,0.3*wave);
     for (int i=0; i<3; i++) {
         float r = length(uv-center[i]);
