@@ -1,3 +1,31 @@
+// Format and print a tree structre that's made of maps of (strings and maps of (...))
+export function printTree(tree) {
+    return printTreeLines(tree,'').join('\n');
+}
+
+function printTreeLines(tree,indent='') {
+    const nextIndent = '  ' + indent; // Double-spaced indent
+    const lines = [];
+    for (const [k,v] of tree) {
+        const header = `${indent}${k}:`;
+        let data;
+        if (v instanceof Map) {
+            data = printTree(v,nextIndent);
+        } else {
+            data = v.toString().split('\n');
+        }
+        if (data.length === 1) {
+            lines.push(header + data[0]);
+        } else {
+            lines.push(header);
+            for (const row of data) {
+                lines.push(nextIndent+row);
+            }
+        }
+    }
+    return lines;
+}
+
 // Uses space characters to line up columns in the input lines
 export function tabulate(title,rows) {
     const DIVIDER = '┊'; // Padding between columns
