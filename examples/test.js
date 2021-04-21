@@ -70,6 +70,7 @@ load({
     // centers
     const centers = [Vec2.From(0.5,0.5),Vec2.From(-0.5,0.5),Vec2.From(0,-0.5)];
     // times
+    const time = Vec1.From(0.0);
     const times = [Vec1.From(2.0),Vec1.From(1.0),Vec1.From(0.0)];
     let nextIndex = 0;
     
@@ -108,10 +109,21 @@ load({
             },
             samplers: {spritesheet: res.images.smile},
         },
+        {   name:"ClearCanvas",
+            framebuffer: canvasFb,
+            shader: null,
+            uniforms: {},
+            draw: (gl) => {
+                gl.clearColor(0.0,0.0,0.02,0.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+            },
+            samplers: {},
+        },
         {   name:"Swirl",
             framebuffer: canvasFb,
             shader:bgShader,
             uniforms: {
+                t: time,
                 'time[0]': times[0],
                 'time[1]': times[1],
                 'time[2]': times[2],
@@ -161,6 +173,7 @@ load({
             times[0].x += dt;         
             times[1].x += dt;         
             times[2].x += dt;
+            time.x += dt;
             spriteGeom.sync(gl);            
             render(gl,env);            
         }

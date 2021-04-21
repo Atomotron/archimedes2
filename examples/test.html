@@ -43,18 +43,20 @@ uniform float time[3];
 uniform vec2 center[3];
 uniform sampler2D background;
 
+uniform float t; // global time
 varying vec2 uv;
 
 float VELOCITY = 0.1;
 float AMPLITUDE = 0.1;
-float WAVENUMBER = 40.0;
+float WAVENUMBER = 20.0;
 
 void main() {
-    vec2 distortion = vec2(0.0,0.0);
+    float wave = 0.01*sin((uv.x*10.0-t)/uv.y);
+    vec2 distortion = vec2(wave,0.3*wave);
     for (int i=0; i<3; i++) {
         float r = length(uv-center[i]);
         vec2 rhat = normalize(uv-center[i]);
-        float phase = WAVENUMBER*(r-time[i]*VELOCITY);
+        float phase = WAVENUMBER*(r-(time[i]-1.0)*VELOCITY);
         float phase2 = phase * phase;
         float amp = AMPLITUDE * (1.0-phase2) * exp(-phase2) / r;
         distortion += rhat*amp;
