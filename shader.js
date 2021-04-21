@@ -283,7 +283,7 @@ export function compileShaders(gl,vshaderSources,fshaderSources,programPairs) {
             if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
                 console.error(prettyPrintShaderErrors(
                     `${type} shader "${name}"`,
-                    sources[name],
+                    sources.get(name),
                     gl.getShaderInfoLog(s),
                 ));
                 errors += 1;
