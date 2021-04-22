@@ -19,7 +19,7 @@ load({
     shaders: {
         vertex: {
             bv:document.querySelector('#background-v'),
-            sv: new URL("sprite.vert", document.baseURI),
+            sv: new URL("smile.vert", document.baseURI),
         },
         fragment:{
             bf:document.querySelector('#background-f'),

@@ -628,7 +628,6 @@ class Mat2 extends AbstractMatMixin(Vec4) {
     }
     // Construct default instance - the identity
     static Default() {
-        console.log(this.TYPE())
         const a = new (this.TYPE())(this.SIZE());
         a[0] = 1.0;
         a[2] = 1.0;

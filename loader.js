@@ -224,7 +224,6 @@ export async function load(settings,progressCallbacks={}) {
         latencyHint: "interactive",
     });
     window.aud = aud;
-    console.log(window.aud);
     const unstickEvents = [
         'mousedown','keydown',
     ];
@@ -389,7 +388,6 @@ export async function load(settings,progressCallbacks={}) {
             streams[name] = data;
         }
     }
-    console.log(streams);
     
     // Wait until audio context is unstuck before returning.
     if (!alreadyUnstuck && !settings.skipAudioWait) {

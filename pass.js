@@ -457,7 +457,7 @@ class PassRecorder {
     }
     // Converts recorded stages to javascript code
     codegen() {
-        console.log(this.lines.join('\n'));
+        //console.log(this.lines.join('\n'));
         return new Function('gl','env',this.lines.join('\n'));
     }
 }
