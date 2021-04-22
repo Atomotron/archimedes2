@@ -2,7 +2,7 @@
 
 import {
     load,
-    CanvasRenderbuffer,Framebuffer,Texture,
+    CanvasRenderbuffer,Framebuffer,
     compileRenderer,
     Geometry,
     // Passes
@@ -83,11 +83,13 @@ load({
     
     // Framebuffer
     const frame = new Framebuffer(gl,512,512);
+    res.io.onResize.add( io => frame.resize(gl,io.width,io.height) );
     const canvasFb = new CanvasRenderbuffer(gl);
     // Render environment
+    const AspectPass = SUM(DrawPass,{uniforms:{aspect:res.io.aspect,aspectInv:res.io.aspectInv}});
     const sequence = [
         SUM(ClearPass,{framebuffer: frame}),
-        SUM(DrawPass,{
+        SUM(AspectPass,{
             name: "Sprites",
             framebuffer: frame,
             shader:shaders.sprite,
@@ -98,7 +100,7 @@ load({
             samplers: {spritesheet: res.images.smile},
         }),
         ClearPass,
-        SUM(DrawPass,{
+        SUM(AspectPass,{
             name:"Swirl",
             shader:bgShader,
             uniforms: {
@@ -119,52 +121,31 @@ load({
     window.gl = gl;
     const [render,env] = compileRenderer(sequence);
     
-    
-    
     // Audio
-    const node = res.aud.createBufferSource();
-    const gain = res.aud.createGain();
+    const node = res.io.adc.createBufferSource();
+    const gain = res.io.adc.createGain();
     gain.gain.value = 0.25;
-    gain.connect(res.aud.destination);
+    gain.connect(res.io.mixer);
     node.buffer = res.sounds.loop;
     node.loop = true;
     node.connect(gain);
     node.start();
     
     canvas.addEventListener('mousedown',(e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const glX = 2.0*x/rect.width - 1.0; // Convert to gl coords
-        const glY = 1.0 - 2.0*y/rect.height;
         times[nextIndex].eqFrom(0);
-        centers[nextIndex].eqFrom(glX,glY);
+        centers[nextIndex].eq(res.io.cursor);
         nextIndex = (nextIndex + 1) % centers.length;
         
-        const node = res.aud.createBufferSource();
+        const node = res.io.adc.createBufferSource();
         node.buffer = res.sounds.hit;
-        node.connect(gain);
+        node.connect(res.io.mixer);
         node.start();
     });
     
     let last_t = null;
     const offset = Vec2.From(-1.0,-1.0);
     (function tick(t_ms) {
-        //https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
-        // Lookup the size the browser is displaying the canvas in CSS pixels.
-        const displayWidth  = canvas.clientWidth;
-        const displayHeight = canvas.clientHeight;
-
-        // Check if the canvas is not the same size.
-        const needResize = canvas.width  !== displayWidth ||
-                         canvas.height !== displayHeight;
-
-        if (needResize) {
-        // Make the canvas the same size
-            canvas.width  = displayWidth;
-            canvas.height = displayHeight;
-            frame.resize(gl,displayWidth,displayHeight);
-        }
+        res.io.refresh();
         if (t_ms !== null && last_t !== null) {
             const dt = (t_ms - last_t) * 0.001;
             // Add new sprites

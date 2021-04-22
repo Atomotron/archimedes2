@@ -429,8 +429,11 @@ class PassRecorder {
                     shaderUniforms.set(uniform,variable);
                     const type = pass.uniformTypes.get(uniform);
                     const uniformv = GL_TYPES[type].uniformv;
+                    const transpose = GL_TYPES[type].nattributes > 1 ?
+                        'false,' : '';
                     l.push(`gl.${uniformv}(` + 
                         `shader.uniforms[${jsString(uniform)}],` +
+                        transpose + 
                         `env.variables[${jsString(variable)}].a);`
                     );
                 }

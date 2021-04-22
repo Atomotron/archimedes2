@@ -1,6 +1,7 @@
 import {isDefined,printTree} from './util.js';
 import {compileShaders} from './shader.js';
 import {Texture} from './image.js';
+import {IO} from './io.js';
 
 // Routines for loading resources and setting things up
 // Attempts to create a webgl context with some common extensions.
@@ -178,9 +179,9 @@ async function loadResources(resources,loader,progressCallback) {
 }
 
 class Resources {
-    constructor(gl,aud,shaders,images,sounds) {
+    constructor(gl,io,shaders,images,sounds) {
         this.gl = gl;
-        this.aud = aud;
+        this.io = io;
         this.shaders = shaders;
         this.images = images;
         this.sounds = sounds;
@@ -359,9 +360,12 @@ export async function load(settings,progressCallbacks={}) {
     if (errors.size > 0) {
         throw printTree(errors);
     }
+    // Construct IO object
+    const io = new IO(settings.canvas,aud);
+    
     return new Resources(
         gl,
-        aud,
+        io,
         shaders,
         images,
         sounds,

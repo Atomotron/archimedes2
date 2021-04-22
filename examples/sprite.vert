@@ -3,6 +3,7 @@
 precision highp float;
 
 uniform float t;
+uniform mat2 aspect;
 
 attribute vec2 vertex;
 attribute vec4 transform;
@@ -26,5 +27,5 @@ void main() {
     
     vcolor = color;
     uv = vertex * vec2(0.5,-0.5) + vec2(0.5);
-    gl_Position = vec4(mat2(transform)*flow*vertex + translate,0.0,1.0);
+    gl_Position = vec4(aspect * (mat2(transform)*flow*vertex + translate),0.0,1.0);
 }
