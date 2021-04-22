@@ -34,7 +34,12 @@ load({
     imageSettings: {
     
     },
+    sounds: {
+        loop: new URL("loop.ogg", document.baseURI),
+        hit: new URL("hit.ogg", document.baseURI),
+    }
 }).then( (res) => {
+    window.res = res;
     const gl = res.gl;
     const shaders = res.shaders;
     const bgShader = shaders.background;
@@ -76,17 +81,6 @@ load({
     const times = [Vec1.From(2.0),Vec1.From(1.0),Vec1.From(0.0)];
     let nextIndex = 0;
     
-    canvas.addEventListener('mousedown',(e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const glX = 2.0*x/rect.width - 1.0; // Convert to gl coords
-        const glY = 1.0 - 2.0*y/rect.height;
-        times[nextIndex].eqFrom(0);
-        centers[nextIndex].eqFrom(glX,glY);
-        nextIndex = (nextIndex + 1) % centers.length;
-    });
-    
     // Framebuffer
     const frame = new Framebuffer(gl,512,512);
     const canvasFb = new CanvasRenderbuffer(gl);
@@ -124,6 +118,34 @@ load({
     ];
     window.gl = gl;
     const [render,env] = compileRenderer(sequence);
+    
+    
+    
+    // Audio
+    const node = res.aud.createBufferSource();
+    const gain = res.aud.createGain();
+    gain.gain.value = 0.25;
+    gain.connect(res.aud.destination);
+    node.buffer = res.sounds.loop;
+    node.loop = true;
+    node.connect(gain);
+    node.start();
+    
+    canvas.addEventListener('mousedown',(e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const glX = 2.0*x/rect.width - 1.0; // Convert to gl coords
+        const glY = 1.0 - 2.0*y/rect.height;
+        times[nextIndex].eqFrom(0);
+        centers[nextIndex].eqFrom(glX,glY);
+        nextIndex = (nextIndex + 1) % centers.length;
+        
+        const node = res.aud.createBufferSource();
+        node.buffer = res.sounds.hit;
+        node.connect(gain);
+        node.start();
+    });
     
     let last_t = null;
     const offset = Vec2.From(-1.0,-1.0);

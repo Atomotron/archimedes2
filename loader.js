@@ -2,19 +2,6 @@ import {isDefined,printTree} from './util.js';
 import {compileShaders} from './shader.js';
 import {Texture} from './image.js';
 
-// Safari compatibility check.
-try {
-    class A {
-        static X = 1.0;
-    }
-} catch (e) {
-    window.alert("Are you running an old version of Safari?\n" + 
-        "You browser does not support static public fields\n" +
-        "which was fixed in Webkit on 2020-11-17:\n" +
-        "https://bugs.webkit.org/show_bug.cgi?id=194095"
-    );
-}
-
 // Routines for loading resources and setting things up
 // Attempts to create a webgl context with some common extensions.
 // Returns {gl:null,messages:[...]} if creation failed (messages will explain why),
@@ -125,6 +112,12 @@ async function getImageAtUrl(url) {
     }
 }
 
+
+// Will return an array buffer
+async function getArrayBufferAtUrl(url) {
+    return await asyncXMLHttpRequest(url,'arraybuffer');
+}
+
 // Returns a promise that resolves to a string
 async function loadStringResource(resource) {
     if (typeof resource === 'string') {
@@ -145,6 +138,15 @@ async function loadImageResource(resource) {
         return resource;
     } else if (resource instanceof URL) {
         return await getImageAtUrl(resource);
+    } else {
+        throw "Attempted to load unrecognized type.";
+    }
+}
+
+// Returns a promise that resolves to a sound
+async function loadSoundResource(resource) {
+    if (resource instanceof URL) {
+        return await getArrayBufferAtUrl(resource);
     } else {
         throw "Attempted to load unrecognized type.";
     }
@@ -176,10 +178,12 @@ async function loadResources(resources,loader,progressCallback) {
 }
 
 class Resources {
-    constructor(gl,shaders,images) {
+    constructor(gl,aud,shaders,images,sounds) {
         this.gl = gl;
+        this.aud = aud;
         this.shaders = shaders;
         this.images = images;
+        this.sounds = sounds;
     }
 }
 
@@ -187,14 +191,45 @@ const defaultProgressCallbacks = {
     vertex : (loaded,total) => console.log(`Loaded ${loaded}/${total} vertex shader sources.`),
     fragment : (loaded,total) => console.log(`Loaded ${loaded}/${total} fragment shader sources.`),
     image : (loaded,total) => console.log(`Loaded ${loaded}/${total} images.`),
+    sound : (loaded,total) => console.log(`Loaded ${loaded}/${total} sounds.`),
+    waitingForInteraction : () => {console.log("The loader cannot finish until a user interaction unsticks the audio context. Waiting...")},
 }
+
 
 export async function load(settings,progressCallbacks={}) {
     progressCallbacks = Object.assign(progressCallbacks,defaultProgressCallbacks);
-    // Loading stage 1: Network requests
-    const errors = new Map();
-    const promises = new Map();
-    const results = new Map();
+    // Set up audio context and listener
+    const aud = new AudioContext({
+        latencyHint: "interactive",
+    });
+    const unstickEvents = [
+        'mousemove','mousedown','mouseup',
+        'keydown','keyup',
+    ];
+    let alreadyUnstuck = false;
+    function asyncEvent(type) {
+        return new Promise( (resolve, reject) => {
+            window.addEventListener(
+                type,
+                (e) => {
+                    aud.resume().then( a => {
+                        resolve(a);
+                    });
+                },
+                {once:true},
+            );
+        });
+    }
+    // Set up several promises to unsticking 
+    const unstickingPromises = [];
+    for (const type of unstickEvents) {
+        unstickingPromises.push(asyncEvent(type));
+    }
+    const unstuck = Promise.any(unstickingPromises).then(
+        ctx => {
+            alreadyUnstuck = true;
+        }
+    );
     
     // Canvas and context
     let gl = null;
@@ -209,6 +244,11 @@ export async function load(settings,progressCallbacks={}) {
     } else {
         errors.set("settings",'missing attribute "canvas"');
     }
+    // Loading stage 1: Network requests
+    const errors = new Map();
+    const promises = new Map();
+    const results = new Map();
+
     // Shaders
     // Get source strings
     if (isDefined(settings.shaders)) {
@@ -248,7 +288,20 @@ export async function load(settings,progressCallbacks={}) {
         errors.set("settings",`missing attribute "images"`);
     }
     
+    // Sounds
+    if (isDefined(settings.sounds)) {
+        promises.set('sounds',loadResources(
+                settings.sounds,
+                async (res) => 
+                    aud.decodeAudioData(await loadSoundResource(res)),
+                progressCallbacks.image,
+            ),
+        )
+    } else {
+        errors.set("settings",`missing attribute "sounds"`);
+    }
     
+
     // Sort promises into errors and results
     for (const [name,promise] of promises) {
         try {
@@ -275,6 +328,7 @@ export async function load(settings,progressCallbacks={}) {
     } else { 
         errors.set('compile-shaders','earlier failures prevent shader compilation');
     }
+    
     // Images -> Texture objects
     let images = {};
     if (gl !== null && results.has('images')) {
@@ -287,13 +341,29 @@ export async function load(settings,progressCallbacks={}) {
         }
     }
     
+    // Sound array buffers -> AudioBuffer
+    let sounds = {};
+    if (results.has('sounds')) {
+        for (const [name,data] of results.get('sounds')) {
+            sounds[name] = data;
+        }
+    }
+    
+    // Wait until audio context is unstuck before returning.
+    if (!alreadyUnstuck) {
+        progressCallbacks.waitingForInteraction();
+    }
+    await unstuck;
+    
     // If there are any errors, format them into a tree and return the message.
     if (errors.size > 0) {
         throw printTree(errors);
     }
     return new Resources(
         gl,
+        aud,
         shaders,
         images,
+        sounds,
     );
 }
