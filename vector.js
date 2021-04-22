@@ -437,6 +437,13 @@ class Vec2 extends AbstractVecN {
         return this;
     }
     
+    // Polar to cartesian
+    eqPolar(self,r,theta) {
+        this.a[0] = r*Math.cos(theta);
+        this.a[1] = r*Math.sin(theta);
+        return this;
+    }
+    
     // Set the components of this vector
     eqFrom(x,y) {
         this.a[0] = x;
