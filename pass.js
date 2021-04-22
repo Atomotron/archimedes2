@@ -242,6 +242,7 @@ function depointerize(passes) {
             // SAMPLERS
             samplers = new Map();
             for (const sampler in pass.samplers) {
+                if (!pass.shader.samplers.has(sampler)) continue;
                 const texture = pass.samplers[sampler];
                 const textureName = textures.add(texture,sampler);
                 const unit = pass.shader.samplers.get(sampler);
