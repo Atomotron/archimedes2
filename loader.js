@@ -153,6 +153,23 @@ async function loadSoundResource(resource) {
     }
 }
 
+// Returns a promise that resolves to a streaming Audio element
+// when its canplaythrough event fires.
+async function loadStreamResource(resource) {
+    if (resource instanceof HTMLAudioElement) {
+        return new Promise( resolve => {
+            resource.addEventListener("canplaythrough", e=>resolve(resource));
+        });
+    } else if (resource instanceof URL) {
+        return new Promise( resolve => {
+            const ae = new Audio(resource);
+            ae.addEventListener("canplaythrough", e=>resolve(ae));
+        });
+    } else {
+        throw "Attempted to load unrecognized type.";
+    }
+}
+
 // Takes: an Object of resources, a function to load them, and a function
 //        to call with (nLoaded,nTotal).
 // Returns: A Promise that resolves to a map filled with loaded resources
@@ -179,12 +196,14 @@ async function loadResources(resources,loader,progressCallback) {
 }
 
 class Resources {
-    constructor(gl,io,shaders,images,sounds) {
-        this.gl = gl;
-        this.io = io;
-        this.shaders = shaders;
-        this.images = images;
-        this.sounds = sounds;
+    constructor(gl,io,shaders,images,sounds,streams) {
+        this.gl = gl;           // webgl context
+        // .io contains io.canvas, audio context io.adc, audio node io.mixer
+        this.io = io;           // IO 
+        this.shaders = shaders; // Shader
+        this.images = images;   // Texture
+        this.sounds = sounds;   // AudioBuffer
+        this.streams = streams; // HTMLAudioElement
     }
 }
 
@@ -193,6 +212,7 @@ const defaultProgressCallbacks = {
     fragment : (loaded,total) => console.log(`Loaded ${loaded}/${total} fragment shader sources.`),
     image : (loaded,total) => console.log(`Loaded ${loaded}/${total} images.`),
     sound : (loaded,total) => console.log(`Loaded ${loaded}/${total} sounds.`),
+    stream: (loaded,total) => console.log(`Ready to play ${loaded}/${total} audio streams.`),
     waitingForInteraction : () => {console.log("The loader cannot finish until a user interaction unsticks the audio context. Waiting...")},
 }
 
@@ -203,9 +223,10 @@ export async function load(settings,progressCallbacks={}) {
     const aud = new AudioContext({
         latencyHint: "interactive",
     });
+    window.aud = aud;
+    console.log(window.aud);
     const unstickEvents = [
-        'mousemove','mousedown','mouseup',
-        'keydown','keyup',
+        'mousedown','keydown',
     ];
     let alreadyUnstuck = false;
     function asyncEvent(type) {
@@ -295,14 +316,25 @@ export async function load(settings,progressCallbacks={}) {
                 settings.sounds,
                 async (res) => 
                     aud.decodeAudioData(await loadSoundResource(res)),
-                progressCallbacks.image,
+                progressCallbacks.sound,
             ),
         )
     } else {
         errors.set("settings",`missing attribute "sounds"`);
     }
     
-
+    // Audio streams
+    if (isDefined(settings.streams)) {
+        promises.set('streams',loadResources(
+                settings.streams,
+                loadStreamResource,
+                progressCallbacks.stream,
+            ),
+        )
+    } else {
+        errors.set("settings",`missing attribute "streams"`);
+    }
+    
     // Sort promises into errors and results
     for (const [name,promise] of promises) {
         try {
@@ -342,7 +374,7 @@ export async function load(settings,progressCallbacks={}) {
         }
     }
     
-    // Sound array buffers -> AudioBuffer
+    // Put audio buffers in object
     let sounds = {};
     if (results.has('sounds')) {
         for (const [name,data] of results.get('sounds')) {
@@ -350,11 +382,20 @@ export async function load(settings,progressCallbacks={}) {
         }
     }
     
+    // Put audio streams in object
+    let streams = {};
+    if (results.has('streams')) {
+        for (const [name,data] of results.get('streams')) {
+            streams[name] = data;
+        }
+    }
+    console.log(streams);
+    
     // Wait until audio context is unstuck before returning.
-    if (!alreadyUnstuck) {
+    if (!alreadyUnstuck && !settings.skipAudioWait) {
         progressCallbacks.waitingForInteraction();
     }
-    await unstuck;
+    if (!settings.skipAudioWait) await unstuck;
     
     // If there are any errors, format them into a tree and return the message.
     if (errors.size > 0) {
@@ -369,5 +410,6 @@ export async function load(settings,progressCallbacks={}) {
         shaders,
         images,
         sounds,
+        streams,
     );
 }

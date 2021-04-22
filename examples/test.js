@@ -37,13 +37,22 @@ load({
     sounds: {
         loop: new URL("loop.ogg", document.baseURI),
         hit: new URL("hit.ogg", document.baseURI),
-    }
+    },
+    streams: {
+        mozilla: new URL("loop.ogg", document.baseURI),
+    },
+    skipAudioWait: true,
 }).then( (res) => {
     window.res = res;
     const gl = res.gl;
     const shaders = res.shaders;
     const bgShader = shaders.background;
     console.log(shaders.background.toString());
+    // Media stream
+    const streamNode = res.io.adc.createMediaElementSource(res.streams.mozilla);
+    streamNode.connect(res.io.mixer);
+    window.mozilla = res.streams.mozilla;
+    
     // Framebuffer
     const fb = new Framebuffer(gl,128,128);
     // Texture
