@@ -1,12 +1,7 @@
-import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
+import {GL_TYPE_INDIRECT_ARRAYS} from './linearalgebra.js';
 import {GL_TYPES} from './webgltypes.js';
 import {tabulate,isDefined} from './util.js';
 import {VertexArraySchema} from './vertices.js';
-/*
-Depends on:
-- `vector.js`
-- `webgltypes.js`
-*/
 
 // djb2 (dan bernstein)
 // http://www.cse.yorku.ca/~oz/hash.html

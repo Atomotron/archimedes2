@@ -6,7 +6,7 @@ Our team wrote [a WebGL engine](https://github.com/Atomotron/ld47-prep) for Ludu
 
 The engine is composed of several modules, documented below:
 - webgltypes.js (Helpful dictionary for interpreting webgl types)
-- vector.js (Vector math)
+- linearalgebra.js (Vector math)
 
 ## Webgltypes
 

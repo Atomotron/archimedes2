@@ -1,4 +1,4 @@
-import {Vec2,Mat2} from './vector.js';
+import {Vec2,Mat2} from './linearalgebra.js';
 // The IO class manages:
 // - Mouse input
 // - Keyboard input
@@ -98,7 +98,7 @@ export class IO {
         // Update cursor coordinates
         const cursorGlX = 2.0*this.cursorX/width - 1.0;
         const cursorGlY = 1.0 - 2.0*this.cursorY/height;
-        this.cursor.eqFrom(cursorGlX/scaleX, cursorGlY/scaleY);
+        this.cursor.eqFrom(cursorGlX, cursorGlY);
         // Run resize triggers
         for (const callback of this.onResize) {
             callback(this);

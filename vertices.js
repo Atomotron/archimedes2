@@ -2,7 +2,7 @@
 import {tabulate,isDefined,RingBuffer} from './util.js';
 import {GL_TYPES} from './webgltypes.js';
 import {AttributeSchema} from './shader.js';
-import {GL_TYPE_INDIRECT_ARRAYS} from './vector.js';
+import {GL_TYPE_INDIRECT_ARRAYS} from './linearalgebra.js';
 
 
 // Computes the largest number that divides both `a` and `b`

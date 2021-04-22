@@ -143,8 +143,31 @@ export class RingBuffer {
             to.push(i);
         }
         return to;
-    }
-    
+    } 
 }
 
+// A helper function that can determine the names of a function's arguments.
+// Copied, more or less, straight from angularjs source code
+// https://github.com/angular/angular.js/blob/9bff2ce8fb170d7a33d3ad551922d7e23e9f82fc/src/auto/injector.js#L77
+// NOTE: THIS CAN BE CONFUSED BY FUNCTION CALLS INSIDE DEFAULT ARGS
+// (I won't bother fixing that because I won't be using it that way.)
+export function extractArgs(fn) {
+    const ARROW_ARG = /^([^(]+?)=>/;
+    const FN_ARGS = /^[^(]*\(\s*([^)]*)\)/m;
+    const FN_ARG_SPLIT = /,/;
+    const FN_ARG = /^\s*(_?)(\S+?)\1\s*$/;
+    const STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
+    
+    // Strip out function signature
+    const strfn = fn.toString();
+    const strfn_nocomments = strfn.replace(STRIP_COMMENTS, '');
+    const signature = strfn_nocomments.match(ARROW_ARG) ||
+                      strfn_nocomments.match(FN_ARGS);
+    const args = signature[1].split(FN_ARG_SPLIT);
+    // Patch to split when everything is an empty string
+    if (args.every(x=>!x)) {
+        return [];
+    }
+    return args;
+}
 

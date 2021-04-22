@@ -86,10 +86,12 @@ load({
     res.io.onResize.add( io => frame.resize(gl,io.width,io.height) );
     const canvasFb = new CanvasRenderbuffer(gl);
     // Render environment
-    const AspectPass = SUM(DrawPass,{uniforms:{aspect:res.io.aspect,aspectInv:res.io.aspectInv}});
+    const camera = Mat2.Id();
+    const cameraInv = Mat2.Id();
+    const CameraPass = SUM(DrawPass,{uniforms:{aspect:camera,aspectInv:cameraInv}});
     const sequence = [
         SUM(ClearPass,{framebuffer: frame}),
-        SUM(AspectPass,{
+        SUM(CameraPass,{
             name: "Sprites",
             framebuffer: frame,
             shader:shaders.sprite,
@@ -100,7 +102,7 @@ load({
             samplers: {spritesheet: res.images.smile},
         }),
         ClearPass,
-        SUM(AspectPass,{
+        SUM(CameraPass,{
             name:"Swirl",
             shader:bgShader,
             uniforms: {
@@ -134,6 +136,10 @@ load({
     canvas.addEventListener('mousedown',(e) => {
         times[nextIndex].eqFrom(0);
         centers[nextIndex].eq(res.io.cursor);
+        console.log(centers[nextIndex].toString());
+        centers[nextIndex].transformEq(cameraInv);
+        console.log(cameraInv.toString());
+        console.log(centers[nextIndex].toString());
         nextIndex = (nextIndex + 1) % centers.length;
         
         const node = res.io.adc.createBufferSource();
@@ -146,6 +152,13 @@ load({
     const offset = Vec2.From(-1.0,-1.0);
     (function tick(t_ms) {
         res.io.refresh();
+        // Update camera from time
+        camera.eqId();
+        camera.mulEq(1.0 + 1.13*Math.tan(time.x*0.1));
+        camera.composeEq(res.io.aspect);
+        camera.rotateEq(time.x * 0.1);
+        cameraInv.eqInverse(camera);
+        
         if (t_ms !== null && last_t !== null) {
             const dt = (t_ms - last_t) * 0.001;
             // Add new sprites
