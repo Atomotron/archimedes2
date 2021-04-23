@@ -41,8 +41,10 @@ load({
     streams: {
         mozilla: new URL("loop.ogg", document.baseURI),
     },
-    skipAudioWait: true,
-}).then( (res) => {
+    skipAudioWait: false,
+},{waitingForInteraction: ()=>document.getElementById('message').textContent = "Click anywhere to start."}
+).then( (res) => {
+    document.getElementById('message').classList.add('hidden');
     window.res = res;
     const gl = res.gl;
     const shaders = res.shaders;

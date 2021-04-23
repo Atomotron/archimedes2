@@ -171,3 +171,18 @@ export function extractArgs(fn) {
     return args;
 }
 
+
+// Finds the nearest power of two >= x
+// Works when x <= 1073741824 (2^30)
+export function nearestPowerOfTwoGreaterThanOrEqual(x) {
+    if (x < 2) return x; // 1 and 0 won't work the method below
+    return nearestPowerOfTwoLessThanOrEqual(x-1) << 1;
+}
+
+// Finds the nearest power of two <= x
+// Works when x <= 1073741824 (2^30)
+export function nearestPowerOfTwoLessThanOrEqual(x) {
+    const leading_unsigned_zeros = Math.clz32(x)-1;
+    return 0x4000_0000 >>> leading_unsigned_zeros;
+}
+

@@ -17,6 +17,18 @@
         height: 100%;
         display: block;
       }
+      /* Status text */
+    .message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #ffffff;
+      font-size: 32pt; 
+    }
+    .hidden {
+        display:none;
+    }
     </style>
 </head>
 <body>
@@ -86,6 +98,7 @@ void main() {
 }
 </script>
 
+<div id='message' class='message'>Loading...</div>
 <canvas id='canvas' width=512 height=512></canvas>
 <img id='tex' src="./tools-861x599-martin-vorel.jpg" alt="texture image" style="display:none;"></img>
 

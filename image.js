@@ -1,3 +1,6 @@
+import {nearestPowerOfTwoGreaterThanOrEqual,
+        nearestPowerOfTwoLessThanOrEqual} from './util.js';
+
 /*
 # Image interface documentation:
 
@@ -44,28 +47,6 @@ The canvas can be selected as a framebuffer by binding `null`. It can't be
 read from by binding as a texture. 
 
 */
-
-// Note: 2^x = 0 for no x, but we still consider 0 a power of two.
-
-// Finds the nearest power of two >= x
-// Works when x <= 1073741824 (2^30)
-function nearestPowerOfTwoGreaterThanOrEqual(x) {
-    if (x < 2) return x; // 1 and 0 won't work the method below
-    return nearestPowerOfTwoLessThanOrEqual(x-1) << 1;
-}
-
-// Finds the nearest power of two <= x
-// Works when x <= 1073741824 (2^30)
-function nearestPowerOfTwoLessThanOrEqual(x) {
-    const leading_unsigned_zeros = Math.clz32(x)-1;
-    return 0x4000_0000 >>> leading_unsigned_zeros;
-}
-
-// Works up to 2^31-1 (max 32 bit signed int)
-// Works when x <= 1073741824 (2^30)
-function isPowerOfTwo(x) {
-    return x === nearestPowerOfTwoLessThanOrEqual(x);    
-}
 
 // Resize an image.
 export function resizeImage(width,height,image,stretch=true) {
@@ -123,6 +104,20 @@ Textures may be created with any of:
 - ImageBitmap.
 
 Creation from buffers is not presently supported.
+
+## Spritesheets
+Loads spritesheets made by free-tex-packer
+See: "http://free-tex-packer.com"
+
+Contains info about the box of a sprite.
+Each field is a vec4 specifying an affine, non-rotating
+transformation from the [-1,1] x [-1,1] unit square to
+the area in the spritesheet that contains the sprite.
+
+In the shader, you'd write something like this:
+  uv = spriteRect.xy + (spriteRect.wz * vertex);
+  to translate the [-1,1] x [-1,1] unit square geometry
+  into uv coordinates for texture lookup.
 */
 export class Texture {
     constructor(gl,source,settings={}) {

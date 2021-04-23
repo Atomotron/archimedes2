@@ -217,8 +217,9 @@ const defaultProgressCallbacks = {
 }
 
 
-export async function load(settings,progressCallbacks={}) {
-    progressCallbacks = Object.assign(progressCallbacks,defaultProgressCallbacks);
+export async function load(settings,customProgressCallbacks={}) {
+    const progressCallbacks = Object.assign({},defaultProgressCallbacks);
+    Object.assign(progressCallbacks,customProgressCallbacks);
     // Set up audio context and listener
     const aud = new AudioContext({
         latencyHint: "interactive",
