@@ -1,6 +1,6 @@
 import {nearestPowerOfTwoGreaterThanOrEqual,
         nearestPowerOfTwoLessThanOrEqual} from './util.js';
-
+import {Spritesheet} from './spritesheet.js';
 /*
 # Image interface documentation:
 
@@ -104,23 +104,9 @@ Textures may be created with any of:
 - ImageBitmap.
 
 Creation from buffers is not presently supported.
-
-## Spritesheets
-Loads spritesheets made by free-tex-packer
-See: "http://free-tex-packer.com"
-
-Contains info about the box of a sprite.
-Each field is a vec4 specifying an affine, non-rotating
-transformation from the [-1,1] x [-1,1] unit square to
-the area in the spritesheet that contains the sprite.
-
-In the shader, you'd write something like this:
-  uv = spriteRect.xy + (spriteRect.wz * vertex);
-  to translate the [-1,1] x [-1,1] unit square geometry
-  into uv coordinates for texture lookup.
 */
 export class Texture {
-    constructor(gl,source,settings={}) {
+    constructor(gl,source,settings={},sheet=null) {
         // Interface info
         this.hasTexture = true;
         this.hasFramebuffer = false;
@@ -138,7 +124,9 @@ export class Texture {
             !mipmapsNeeded &&
             this.wrapS === gl.CLAMP_TO_EDGE &&
             this.wrapT === gl.CLAMP_TO_EDGE;
-        const [sourceWidth,sourceHeight] = trueDimensions(source);  
+        const [sourceWidth,sourceHeight] = trueDimensions(source);
+        this.sourceWidth = sourceWidth;
+        this.sourceHeight = sourceHeight;
         let safeSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         // safeSize is not always a power of two, so we have to clip it.
         safeSize = canBeNPoT ? safeSize : 
@@ -189,6 +177,8 @@ export class Texture {
         // extends over. If stretched, it's the whole thing.
         this.maxU = this.stretch ? 1.0 : sourceWidth / targetWidth;
         this.maxV = this.stretch ? 1.0 : sourceHeight / targetHeight;
+        // Set up spritesheet
+        this.sheet = new Spritesheet(this,sheet);
     }
     destroy(gl) {
         gl.deleteTexture(this.texture);    

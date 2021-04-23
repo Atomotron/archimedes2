@@ -213,6 +213,7 @@ const defaultProgressCallbacks = {
     image : (loaded,total) => console.log(`Loaded ${loaded}/${total} images.`),
     sound : (loaded,total) => console.log(`Loaded ${loaded}/${total} sounds.`),
     stream: (loaded,total) => console.log(`Ready to play ${loaded}/${total} audio streams.`),
+    spritesheet: (loaded,total) => console.log(`Loaded ${loaded}/${total} spritesheets.`),
     waitingForInteraction : () => {console.log("The loader cannot finish until a user interaction unsticks the audio context. Waiting...")},
 }
 
@@ -310,6 +311,20 @@ export async function load(settings,customProgressCallbacks={}) {
         errors.set("settings",`missing attribute "images"`);
     }
     
+    // Images
+    if (isDefined(settings.spritesheets)) {
+        promises.set('spritesheets',loadResources(
+            settings.spritesheets,
+            async (res) => {
+                const json = await loadStringResource(res);
+                return JSON.parse(json);
+            },
+            progressCallbacks.spritesheet,
+        ));
+    } else {
+        errors.set("settings",`missing attribute "spritesheets"`);
+    }
+    
     // Sounds
     if (isDefined(settings.sounds)) {
         promises.set('sounds',loadResources(
@@ -370,7 +385,14 @@ export async function load(settings,customProgressCallbacks={}) {
             if (settings.imageSettings && settings.imageSettings[name]) {
                 imageSettings = settings.imageSettings[name];
             }
-            images[name] = new Texture(gl,image,imageSettings);
+            let sheetJson = null;
+            if (results.has('spritesheets')) {
+                console.log(results.get('spritesheets'));
+                if (results.get('spritesheets').has(name)) {
+                    sheetJson = results.get('spritesheets').get(name);
+                }
+            }
+            images[name] = new Texture(gl,image,imageSettings,sheetJson);
         }
     }
     

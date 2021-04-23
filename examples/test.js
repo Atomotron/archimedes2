@@ -41,6 +41,7 @@ load({
     streams: {
         mozilla: new URL("loop.ogg", document.baseURI),
     },
+    spritesheets: {},
     skipAudioWait: false,
 },{waitingForInteraction: ()=>document.getElementById('message').textContent = "Click anywhere to start."}
 ).then( (res) => {

@@ -1,0 +1,118 @@
+{
+  "frames": {
+    "floor.png": {
+      "frame": {
+        "h": 46,
+        "w": 494,
+        "x": 0,
+        "y": 0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 50,
+        "w": 500
+      },
+      "spriteSourceSize": {
+        "h": 46,
+        "w": 494,
+        "x": 3,
+        "y": 4
+      },
+      "trimmed": true
+    },
+    "smile.png": {
+      "frame": {
+        "h": 300,
+        "w": 300,
+        "x": 494,
+        "y": 0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 300,
+        "w": 300
+      },
+      "spriteSourceSize": {
+        "h": 300,
+        "w": 300,
+        "x": 0,
+        "y": 0
+      },
+      "trimmed": false
+    },
+    "square.png": {
+      "frame": {
+        "h": 98,
+        "w": 99,
+        "x": 0,
+        "y": 46
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 100,
+        "w": 100
+      },
+      "spriteSourceSize": {
+        "h": 98,
+        "w": 99,
+        "x": 1,
+        "y": 2
+      },
+      "trimmed": true
+    },
+    "triangle.png": {
+      "circles": {
+        "Head": {
+          "cx": "602",
+          "cy": "252",
+          "r": "38.0"
+        }
+      },
+      "frame": {
+        "h": 97,
+        "w": 97,
+        "x": 99,
+        "y": 46
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rotated": false,
+      "sourceSize": {
+        "h": 100,
+        "w": 100
+      },
+      "spriteSourceSize": {
+        "h": 97,
+        "w": 97,
+        "x": 1,
+        "y": 2
+      },
+      "trimmed": true
+    }
+  },
+  "meta": {
+    "app": "http://free-tex-packer.com",
+    "format": "RGBA8888",
+    "image": "texture.png",
+    "scale": 1,
+    "size": {
+      "h": 300,
+      "w": 794
+    },
+    "version": "0.6.6"
+  }
+}

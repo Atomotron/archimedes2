@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: lime;
+      }
+
+      .cls-2 {
+        fill-rule: evenodd;
+      }
+    </style>
+  </defs>
+  <ellipse id="Head" class="cls-1" cx="602" cy="252" rx="37" ry="39"/>
+  <path id="Body" class="cls-2" d="M623,277l51,83,12,125,8,170-90-25-4-86,28-123-56-32-40-66"/>
+  <path id="Upper_Arm" data-name="Upper Arm" class="cls-2" d="M619.218,287.091l3.564,1.818-50,98-3.564-1.818Z"/>
+  <path id="Lower_Arm" data-name="Lower Arm" class="cls-2" d="M574.688,384.928l-3.376,2.144-40-63,3.376-2.144Z"/>
+</svg>
